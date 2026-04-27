@@ -1,0 +1,12 @@
+# Copy this file to local.properties and adjust values.
+# local.properties MUST NOT be committed.
+
+# Path to the Android SDK (Android Studio will set this automatically).
+sdk.dir=C\:\\Users\\YourUser\\AppData\\Local\\Android\\Sdk
+
+# SHA-256 hash of the signing certificate used to sign the production APK.
+# Used by IntegrityManager at runtime to verify the APK has not been re-signed.
+# To compute it, run:
+#   keytool -list -v -keystore my-release-key.jks | findstr SHA256
+# Then strip the colons.
+APK_SIGNATURE_SHA256=00000000000000000000000000000000000000000000000000000000DEADBEEF
