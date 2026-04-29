@@ -21,5 +21,6 @@ data class EventLogEntity(
         const val CONTEXT_BREACH = "CONTEXT_BREACH"
         const val BREACH_CONFIRMED = "BREACH_CONFIRMED"
         const val LOCKDOWN_TRIGGERED = "LOCKDOWN_TRIGGERED"
+        const val FALSE_REJECT_RESOLVED = "FALSE_REJECT_RESOLVED"
     }
 }

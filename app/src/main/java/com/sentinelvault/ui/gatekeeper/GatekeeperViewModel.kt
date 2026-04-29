@@ -3,6 +3,7 @@ package com.sentinelvault.ui.gatekeeper
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sentinelvault.data.auth.PinRepository
+import com.sentinelvault.lockdown.LockdownCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.Job
@@ -15,7 +16,8 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class GatekeeperViewModel @Inject constructor(
-    private val pinRepository: PinRepository
+    private val pinRepository: PinRepository,
+    private val lockdownCoordinator: LockdownCoordinator
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(initialState())
@@ -92,6 +94,7 @@ class GatekeeperViewModel @Inject constructor(
         when (result) {
             PinRepository.VerifyResult.Success -> {
                 _state.update { it.copy(entry = "", errorMessage = null) }
+                viewModelScope.launch { lockdownCoordinator.acknowledgeOwnerReturn() }
                 _events.value = GatekeeperEvent.Authenticated
             }
             is PinRepository.VerifyResult.Failure -> {

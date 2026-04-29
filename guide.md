@@ -1,6 +1,6 @@
 # SENTINEL VAULT - MASTER DEVELOPMENT GUIDE & AI CONTEXT
 
-- **Version:** 4.3 (Epic 5 vigilance state machine landed: cosine evaluator, variance-based liveness probe, pulsed-sampling orchestration)
+- **Version:** 4.4 (Epic 6 lockdown landed: `WindowManager` soft-lock overlay, `DevicePolicyManager` hard lock, self-healing PIN recovery wired through `LockdownCoordinator`)
 - **Target Platform:** Android (Native Kotlin), `minSdk = 26`, `targetSdk = 34`, `compileSdk = 34`.
 - **JVM Toolchain:** Java 17 source/target; Kotlin `2.2.x`; Android Gradle Plugin `9.x`.
 - **Distribution:** Manual Sideloading (.apk) - No Play Store restrictions.
@@ -396,12 +396,12 @@ Single consumer for now: the Epic 5 state machine collects `TriggerOrchestrator.
 ### EPIC 6: Action, Punishment & Lockdown
 **Goal:** Defensive actions upon `BREACH_CONFIRMED`.
 
-- [ ] **Task 6.1:** Soft Lock UI & Self-Healing
-  - [ ] Implement Compose `SYSTEM_ALERT_WINDOW` overlay.
-  - [ ] Handle False Reject (Self-Healing injection).
-- [ ] **Task 6.2:** Hard Lock (Hardware)
-  - [ ] Invoke `DevicePolicyManager.lockNow()`.
-- [ ] **Epic 6 Tests:** Overlay focus capture, `DevicePolicyManager` invocation.
+- [x] **Task 6.1:** Soft Lock UI & Self-Healing
+  - [x] Implement Compose `SYSTEM_ALERT_WINDOW` overlay (`WindowManagerOverlayController` + `OverlayHostFactory` providing `Lifecycle`/`ViewModelStore`/`SavedStateRegistry` owners to a detached `ComposeView`; `LayoutParamsFactory` isolates `WindowManager.LayoutParams` for JVM unit tests).
+  - [x] Handle False Reject (Self-Healing injection) via `SelfHealingController` relaxing `VigilanceConfig.matchThreshold` after `GatekeeperViewModel` calls `LockdownCoordinator.acknowledgeOwnerReturn()` on a successful PIN.
+- [x] **Task 6.2:** Hard Lock (Hardware)
+  - [x] Invoke `DevicePolicyManager.lockNow()` through `DefaultDevicePolicyController`, fanned in by `DefaultLockdownAction` which also persists a `BREACH` `EventLogEntity` and arms the overlay.
+- [x] **Epic 6 Tests:** `WindowManagerOverlayControllerTest` (arm/show/dismiss state machine, idempotency, `addView`/`removeView` failure recovery), `DefaultLockdownActionTest` (event logging + `lockNow` dispatch), `SelfHealingControllerTest` (threshold relaxation), `LockdownCoordinatorTest` (state→action mapping, breach de-duplication, intermediate-state no-op).
 
 ---
 
