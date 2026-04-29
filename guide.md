@@ -1,6 +1,6 @@
 # SENTINEL VAULT - MASTER DEVELOPMENT GUIDE & AI CONTEXT
 
-- **Version:** 4.2 (Epic 4 trigger stack landed, exhaustive product description, deep technical inventory)
+- **Version:** 4.3 (Epic 5 vigilance state machine landed: cosine evaluator, variance-based liveness probe, pulsed-sampling orchestration)
 - **Target Platform:** Android (Native Kotlin), `minSdk = 26`, `targetSdk = 34`, `compileSdk = 34`.
 - **JVM Toolchain:** Java 17 source/target; Kotlin `2.2.x`; Android Gradle Plugin `9.x`.
 - **Distribution:** Manual Sideloading (.apk) - No Play Store restrictions.
@@ -382,13 +382,14 @@ Single consumer for now: the Epic 5 state machine collects `TriggerOrchestrator.
 ### EPIC 5: The 3-Minute State Machine Protocol
 **Goal:** Execute the core logic when a threat is suspected.
 
-- [ ] **Task 5.1:** StateFlow Orchestration
-  - [ ] Define states (`IDLE`, `ALERT_LEVEL_1`, `ALERT_LEVEL_2`, `BREACH_CONFIRMED`).
-  - [ ] Implement Pulsed Sampling (CameraX every 3s).
-- [ ] **Task 5.2:** Evaluation Engine
-  - [ ] Implement Cosine Similarity math.
-  - [ ] Handle presentation attacks (reject flat frames).
-- [ ] **Epic 5 Tests:** `TestDispatcher` timeline simulation.
+- [x] **Task 5.1:** StateFlow Orchestration
+  - [x] Define states (`Idle`, `VerifyOnce`, `AlertLevel1`, `AlertLevel2`, `BreachConfirmed`) in `VigilanceState`.
+  - [x] Implement Pulsed Sampling via `PulseScheduler` (default 3 s) + `VigilanceStateMachine` consuming `TriggerOrchestrator.events`. Camera frame source abstracted behind `VerificationFrameSource` (`NoOpVerificationFrameSource` until Epic 6 wires CameraX).
+- [x] **Task 5.2:** Evaluation Engine
+  - [x] `CosineSimilarity.between` (clamped, dimension-checked).
+  - [x] `VarianceLivenessProbe` rejects flat / printed frames using single-pass luminance variance (BT.601 luma, configurable stride and threshold).
+  - [x] `FrameVerifier` orchestrates detect → liveness → embed → cosine, sanitises every intermediate buffer through `MemorySanitizer`.
+- [x] **Epic 5 Tests:** `CosineSimilarityTest`, `LivenessProbeTest`, `FrameVerifierTest`, `VigilanceStateMachineTest` (UnconfinedTestDispatcher timeline + fake `PulseScheduler` + queued `VerificationEngine`).
 
 ---
 
