@@ -140,26 +140,26 @@ Use standard Jetpack Compose Navigation (`NavHost`). The following string routes
 ### EPIC 2: Jetpack Compose Frontend & Permissions
 **Goal:** Build the UI navigation, `route_gatekeeper`, and `route_onboarding`.
 
-- [ ] **Task 2.1:** The Gatekeeper UI
-  - [ ] Setup `NavHost` with all defined routes.
-  - [ ] Build `PinPadView` and `route_gatekeeper` logic (brute-force timeout).
-- [ ] **Task 2.2:** Educational Permission Engine
-  - [ ] Build `route_onboarding` horizontal pager.
-  - [ ] Implement permission request logic (Admin, Accessibility) & Android 13 bypass instructions.
-- [ ] **Epic 2 Tests:** Espresso UI Tests for PinPad and NavHost transitions.
+- [x] **Task 2.1:** The Gatekeeper UI
+  - [x] Setup `NavHost` with all defined routes.
+  - [x] Build `PinPadView` and `route_gatekeeper` logic (brute-force timeout).
+- [x] **Task 2.2:** Educational Permission Engine
+  - [x] Build `route_onboarding` horizontal pager.
+  - [x] Implement permission request logic (Admin, Accessibility) & Android 13 bypass instructions.
+- [x] **Epic 2 Tests:** Espresso UI Tests for PinPad and NavHost transitions.
 
 ---
 
 ### EPIC 3: Zero-Knowledge Biometric Enrollment
 **Goal:** Capture owner's face safely (`route_enrollment`).
 
-- [ ] **Task 3.1:** Guided Capture UI
-  - [ ] Create CameraX Compose wrapper with `ArMaskOverlay`.
-- [ ] **Task 3.2:** TFLite Inference & Memory Hygiene
-  - [ ] Implement MediaPipe/BlazeFace and MobileFaceNet execution.
-  - [ ] Create `MemorySanitizer`.
-  - [ ] Save 128-d vectors via `EmbeddingDao`.
-- [ ] **Epic 3 Tests:** TFLite mock inference, `MemorySanitizer` object nullification.
+- [x] **Task 3.1:** Guided Capture UI
+  - [x] Create CameraX Compose wrapper with `ArMaskOverlay`.
+- [x] **Task 3.2:** TFLite Inference & Memory Hygiene
+  - [x] Implement MediaPipe/BlazeFace and MobileFaceNet execution.
+  - [x] Create `MemorySanitizer`.
+  - [x] Save 128-d vectors via `EmbeddingDao`.
+- [x] **Epic 3 Tests:** TFLite mock inference, `MemorySanitizer` object nullification.
 
 ---
 

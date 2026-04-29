@@ -29,7 +29,7 @@ object DatabaseModule {
         val factory = SupportOpenHelperFactory(passphrase)
         return Room.databaseBuilder(context, SentinelDatabase::class.java, SentinelDatabase.NAME)
             .openHelperFactory(factory)
-            .fallbackToDestructiveMigration()
+            .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }
 
