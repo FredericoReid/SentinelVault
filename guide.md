@@ -1,7 +1,7 @@
 # SENTINEL VAULT - MASTER DEVELOPMENT GUIDE & AI CONTEXT
 
 - **Version:** 4.4 (Epic 6 lockdown landed: `WindowManager` soft-lock overlay, `DevicePolicyManager` hard lock, self-healing PIN recovery wired through `LockdownCoordinator`)
-- **Target Platform:** Android (Native Kotlin), `minSdk = 26`, `targetSdk = 34`, `compileSdk = 34`.
+- **Target Platform:** Android (Native Kotlin), `minSdk = 26`, `targetSdk = 36`, `compileSdk = 36` (Android 16). Required so the Android 15+/16 `PackageInstaller` accepts manual sideload.
 - **JVM Toolchain:** Java 17 source/target; Kotlin `2.2.x`; Android Gradle Plugin `9.x`.
 - **Distribution:** Manual Sideloading (.apk) - No Play Store restrictions.
 - **Runtime Footprint Target:** Cold start ≤ 800 ms on a Pixel 6, idle RSS ≤ 60 MB, average wake-up CPU budget per trigger ≤ 25 ms (camera frame excluded).
@@ -415,6 +415,31 @@ Single consumer for now: the Epic 5 state machine collects `TriggerOrchestrator.
   - [ ] Build `route_dashboard` using `EventCard`.
   - [ ] Build `route_incident_detail`.
 - [ ] **Epic 7 Tests:** Mock 1.6GB data for FIFO validation.
+
+---
+
+## 9. TECHNICAL DEBT BACKLOG
+
+Non-blocking warnings that surfaced after the bump to `compileSdk = 36` / `targetSdk = 36` and Compose BOM `2026.04.01`. Each item is opt-in tech debt: the build is green, the APK installs and runs, but the deprecated APIs will be removed in AGP 10 / a future Android release. Address before the next major SDK bump.
+
+### 9.1 Android 15+ Edge-to-Edge Enforcement
+- [ ] **Theme.kt** — replace `window.statusBarColor` / `window.navigationBarColor` writes with `WindowCompat.setDecorFitsSystemWindows(window, false)` plus `Modifier.systemBarsPadding()` / `Scaffold` insets. Both setters are no-ops on `targetSdk = 35+`.
+- [ ] **LayoutParamsFactory.kt** — drop `WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR` from the lockdown overlay flags (deprecated since API 30, ignored from API 35).
+
+### 9.2 Foreground / Usage APIs
+- [ ] **UsageStatsForegroundTracker.kt** + **UsageStatsForegroundTrackerTest.kt** — migrate `UsageEvents.Event.MOVE_TO_FOREGROUND` / `MOVE_TO_BACKGROUND` to `ACTIVITY_RESUMED` / `ACTIVITY_PAUSED` (Android 10+ replacement, same semantics).
+- [ ] **PermissionsCoordinator.kt** — replace `AppOpsManager.unsafeCheckOpNoThrow(...)` with `unsafeCheckOpNoThrow(op, uid, packageName)` overload that takes an `AttributionSource`, or fall back to `checkOpNoThrow` gated by SDK level.
+
+### 9.3 AGP 9 → 10 DSL Migration
+- [ ] **app/build.gradle.kts** — migrate `kotlinOptions { jvmTarget = "17" }` to the `compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }` DSL (KT-49746).
+- [ ] **app/build.gradle.kts** — replace the top-level `android { ... }` block configured via `BaseAppModuleExtension` with `com.android.build.api.dsl.ApplicationExtension` (will become the only supported DSL in AGP 10).
+- [ ] **build infrastructure** — audit any caller of `applicationVariants` / `testVariants` / `unitTestVariants` and port to `AndroidComponentsExtension` (currently no internal callers; warning is emitted by a transitive plugin).
+
+### 9.4 Kotlin 2.x Annotation Targets (KT-73255)
+- [ ] **DatabaseKeyProvider.kt** + **DefaultDevicePolicyController.kt** — qualify the constructor-injected annotations with the explicit `@param:` site (e.g. `@param:ApplicationContext`) to keep the current "value parameter only" semantics, or opt into the future default with `-Xannotation-default-target=param-property` in the Kotlin compiler args.
+
+### 9.5 LiteRT Namespace Collision
+- [ ] **gradle/libs.versions.toml** — track upstream fix for `com.google.ai.edge.litert:litert-support` and `litert-support-api` sharing the `org.tensorflow.lite.support` namespace (manifest-merger warning, no runtime impact).
 
 ---
 
