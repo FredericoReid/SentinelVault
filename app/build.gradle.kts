@@ -117,9 +117,13 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.androidx.camera.view)
 
-    // TensorFlow Lite (Edge AI - no internet, no Play services)
-    implementation(libs.tensorflow.lite)
-    implementation(libs.tensorflow.lite.support)
+    // LiteRT (formerly TensorFlow Lite) - Edge AI, no internet, no Play services.
+    // Keeps the org.tensorflow.lite.Interpreter API and ships 16 KB-aligned native libs.
+    implementation(libs.litert)
+    implementation(libs.litert.support)
+
+    // Force a 16 KB-aligned androidx.graphics.path native lib (Compose BOM still pulls 1.0.1).
+    implementation(libs.androidx.graphics.path)
 
     // Unit tests
     testImplementation(libs.junit)

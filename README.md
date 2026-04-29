@@ -86,9 +86,9 @@ deliberately does not have.
 - **Language / Async:** Kotlin 2.2, Coroutines, `Flow` / `StateFlow` / `SharedFlow`.
 - **UI:** Jetpack Compose (Material 3) on a single-Activity / NavHost architecture.
 - **DI:** Hilt.
-- **Persistence:** Room 2.6 + SQLCipher 4.6.
-- **Vision:** CameraX `ImageAnalysis`.
-- **ML:** TensorFlow Lite 2.16 (NNAPI delegate) — BlazeFace + MobileFaceNet INT8.
+- **Persistence:** Room 2.6 + SQLCipher 4.10 (16 KB-aligned).
+- **Vision:** CameraX 1.4 `ImageAnalysis` (16 KB-aligned native libs).
+- **ML:** LiteRT 1.4 (`com.google.ai.edge.litert`, successor of TensorFlow Lite, NNAPI delegate) — BlazeFace + MobileFaceNet INT8.
 - **System integrations:** `DevicePolicyManager`, `AccessibilityService`, `UsageStatsManager`, `SensorManager`.
 - **Testing:** JUnit 4, Truth, MockK, Coroutines `kotlinx-coroutines-test` (`UnconfinedTestDispatcher`), Compose UI tests, Hilt test runner.
 - **Min SDK:** 26 — **Target / Compile SDK:** 34 — **JVM toolchain:** Java 17.
