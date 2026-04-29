@@ -57,7 +57,13 @@ fun SentinelNavHost(
                 }
             )
         }
-        composable(Routes.DASHBOARD) { DashboardScreen() }
+        composable(Routes.DASHBOARD) {
+            DashboardScreen(
+                onIncidentClick = { incidentId ->
+                    navController.navigate(Routes.incidentDetail(incidentId))
+                }
+            )
+        }
         composable(
             route = Routes.INCIDENT_DETAIL_PATTERN,
             arguments = listOf(navArgument(Routes.INCIDENT_ID_ARG) { type = NavType.LongType })

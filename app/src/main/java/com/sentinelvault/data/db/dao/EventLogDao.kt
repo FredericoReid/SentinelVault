@@ -29,4 +29,19 @@ interface EventLogDao {
 
     @Query("DELETE FROM event_log")
     suspend fun deleteAll()
+
+    /**
+     * Rows that still carry an on-disk evidence artefact, ordered oldest-first. Powers the
+     * Epic 7 FIFO ring-buffer pass (see [com.sentinelvault.vault.EvidenceRetentionPolicy]).
+     */
+    @Query("SELECT * FROM event_log WHERE evidencePath IS NOT NULL ORDER BY timestampMs ASC")
+    suspend fun getEventsWithEvidenceOldestFirst(): List<EventLogEntity>
+
+    /** Drops the path reference without deleting the row, preserving the timeline metadata. */
+    @Query("UPDATE event_log SET evidencePath = NULL WHERE id = :id")
+    suspend fun clearEvidencePath(id: Long)
+
+    /** Attaches an evidence path to a previously-recorded event row. */
+    @Query("UPDATE event_log SET evidencePath = :path WHERE id = :id")
+    suspend fun updateEvidencePath(id: Long, path: String)
 }

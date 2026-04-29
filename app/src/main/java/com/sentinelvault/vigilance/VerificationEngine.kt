@@ -1,5 +1,6 @@
 package com.sentinelvault.vigilance
 
+import com.sentinelvault.vault.BurstRecorder
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,18 +14,24 @@ fun interface VerificationEngine {
 }
 
 /**
- * Default engine: pulls a frame from the [VerificationFrameSource] and pushes it through
- * the [FrameVerifier]. A `null` frame collapses to [VerificationOutcome.NoFace] so the
- * state machine sees a benign signal instead of a crash.
+ * Default engine: pulls a frame from the [VerificationFrameSource], offers it to the
+ * Epic 7 [BurstRecorder] (no-op outside an investigation window) and pushes the original
+ * through the [FrameVerifier]. A `null` frame collapses to [VerificationOutcome.NoFace]
+ * so the state machine sees a benign signal instead of a crash.
+ *
+ * The recorder clones the bitmap before this call returns, so the verifier remains free
+ * to recycle the source frame as part of its sanitisation pass.
  */
 @Singleton
 class DefaultVerificationEngine @Inject constructor(
     private val frameSource: VerificationFrameSource,
-    private val frameVerifier: FrameVerifier
+    private val frameVerifier: FrameVerifier,
+    private val burstRecorder: BurstRecorder
 ) : VerificationEngine {
 
     override suspend fun verifyOnce(nowMs: Long): VerificationOutcome {
         val bitmap = frameSource.capture() ?: return VerificationOutcome.NoFace(nowMs)
+        burstRecorder.offer(bitmap, nowMs)
         return frameVerifier.verify(bitmap)
     }
 }

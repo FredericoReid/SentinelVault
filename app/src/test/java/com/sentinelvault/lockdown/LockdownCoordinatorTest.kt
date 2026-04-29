@@ -1,6 +1,9 @@
 package com.sentinelvault.lockdown
 
 import com.google.common.truth.Truth.assertThat
+import com.sentinelvault.vault.BurstRecorder
+import com.sentinelvault.vault.EvidenceVault
+import com.sentinelvault.vault.FrameCandidate
 import com.sentinelvault.vigilance.VigilanceState
 import com.sentinelvault.vigilance.VigilanceStateMachine
 import io.mockk.coEvery
@@ -34,11 +37,14 @@ class LockdownCoordinatorTest {
         val action: LockdownAction,
         val selfHealing: SelfHealingController,
         val machine: VigilanceStateMachine,
-        val state: MutableStateFlow<VigilanceState>
+        val state: MutableStateFlow<VigilanceState>,
+        val burstRecorder: BurstRecorder,
+        val evidenceVault: EvidenceVault
     )
 
     private fun fixture(
-        triggerResult: LockdownAction.Result = LockdownAction.Result.HardLocked(breachId = 9L, lockEventId = 10L)
+        triggerResult: LockdownAction.Result = LockdownAction.Result.HardLocked(breachId = 9L, lockEventId = 10L),
+        drained: List<FrameCandidate> = emptyList()
     ): Fixture {
         val state = MutableStateFlow<VigilanceState>(VigilanceState.Idle())
         val machine = mockk<VigilanceStateMachine>()
@@ -49,7 +55,23 @@ class LockdownCoordinatorTest {
         val selfHealing = mockk<SelfHealingController>()
         coEvery { selfHealing.markFalseReject(any()) } returns 77L
         val overlay = FakeOverlay()
-        return Fixture(LockdownCoordinator(machine, overlay, action, selfHealing), overlay, action, selfHealing, machine, state)
+        val burstRecorder = mockk<BurstRecorder>(relaxed = true)
+        coEvery { burstRecorder.drain() } returns drained
+        val evidenceVault = mockk<EvidenceVault>(relaxed = true)
+        coEvery { evidenceVault.storeBreachEvidence(any(), any()) } returns
+            EvidenceVault.Outcome.Skipped.NoCandidates
+        return Fixture(
+            coordinator = LockdownCoordinator(
+                machine, overlay, action, selfHealing, burstRecorder, evidenceVault
+            ),
+            overlay = overlay,
+            action = action,
+            selfHealing = selfHealing,
+            machine = machine,
+            state = state,
+            burstRecorder = burstRecorder,
+            evidenceVault = evidenceVault
+        )
     }
 
     @Test
@@ -142,5 +164,61 @@ class LockdownCoordinatorTest {
         f.state.value = VigilanceState.AlertLevel1(sinceMs = 2L, mismatchStreak = 1)
         assertThat(f.overlay.mode).isEqualTo(SoftLockOverlayController.Mode.OFF)
         coVerify(exactly = 0) { f.action.trigger(any()) }
+    }
+
+    @Test
+    fun `AlertLevel1 arms the burst recorder without arming the overlay`() = runTest(dispatcher) {
+        val f = fixture()
+        backgroundScope.launch(dispatcher) { f.coordinator.observe() }
+        f.state.value = VigilanceState.AlertLevel1(sinceMs = 1L, mismatchStreak = 1)
+        coVerify(exactly = 1) { f.burstRecorder.arm() }
+        assertThat(f.overlay.mode).isEqualTo(SoftLockOverlayController.Mode.OFF)
+    }
+
+    @Test
+    fun `AlertLevel2 arms both the burst recorder and the overlay`() = runTest(dispatcher) {
+        val f = fixture()
+        backgroundScope.launch(dispatcher) { f.coordinator.observe() }
+        f.state.value = VigilanceState.AlertLevel2(sinceMs = 1L, mismatchStreak = 2)
+        coVerify(exactly = 1) { f.burstRecorder.arm() }
+        assertThat(f.overlay.mode).isEqualTo(SoftLockOverlayController.Mode.ARMED)
+    }
+
+    @Test
+    fun `Idle disarms the burst recorder`() = runTest(dispatcher) {
+        val f = fixture()
+        backgroundScope.launch(dispatcher) { f.coordinator.observe() }
+        f.state.value = VigilanceState.AlertLevel2(sinceMs = 1L, mismatchStreak = 2)
+        f.state.value = VigilanceState.Idle(sinceMs = 5L)
+        coVerify(atLeast = 1) { f.burstRecorder.disarm() }
+    }
+
+    @Test
+    fun `BreachConfirmed drains the burst and persists evidence with the latched breach id`() = runTest(dispatcher) {
+        val burst = listOf(
+            FrameCandidate(
+                bitmap = io.mockk.mockk(relaxed = true),
+                capturedAtMs = 42L,
+                luma = ByteArray(4),
+                width = 2,
+                height = 2
+            )
+        )
+        val f = fixture(drained = burst)
+        backgroundScope.launch(dispatcher) { f.coordinator.observe() }
+        f.state.value = VigilanceState.BreachConfirmed(sinceMs = 2L, mismatchStreak = 3)
+
+        coVerify(exactly = 1) { f.burstRecorder.drain() }
+        coVerify(exactly = 1) { f.evidenceVault.storeBreachEvidence(9L, burst) }
+    }
+
+    @Test
+    fun `re-emitted BreachConfirmed does not re-drain or re-persist evidence`() = runTest(dispatcher) {
+        val f = fixture()
+        backgroundScope.launch(dispatcher) { f.coordinator.observe() }
+        f.state.value = VigilanceState.BreachConfirmed(sinceMs = 1L, mismatchStreak = 3)
+        f.state.value = VigilanceState.BreachConfirmed(sinceMs = 2L, mismatchStreak = 3)
+        coVerify(exactly = 1) { f.burstRecorder.drain() }
+        coVerify(exactly = 1) { f.evidenceVault.storeBreachEvidence(any(), any()) }
     }
 }
