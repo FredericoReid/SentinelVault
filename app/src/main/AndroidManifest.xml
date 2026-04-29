@@ -6,9 +6,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+      The CAMERA permission implicitly declares android.hardware.camera as required.
+      We mark it required="false" so the APK remains installable on devices without a
+      generic/back camera (e.g. ChromeOS); the front camera is what we actually use and
+      its absence is handled gracefully at runtime by the enrollment flow.
+    -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
     <uses-feature
         android:name="android.hardware.camera.front"
-        android:required="true" />
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
 
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -20,6 +32,7 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
 
     <application
         android:name=".SentinelApp"
@@ -58,5 +71,31 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+
+        <!-- Epic 4: passive trigger for "device just unlocked". ACTION_USER_PRESENT is in
+             the Android 8+ implicit-broadcast exception list, so manifest registration is
+             still permitted without a sticky service. -->
+        <receiver
+            android:name=".triggers.UserPresentReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Epic 4: push-based foreground tracker. The user must enable Sentinel under
+             Settings → Accessibility before this fires. -->
+        <service
+            android:name=".triggers.SentinelAccessibilityService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
     </application>
 </manifest>

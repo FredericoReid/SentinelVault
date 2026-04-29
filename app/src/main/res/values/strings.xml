@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">SentinelVault</string>
+    <string name="accessibility_service_label">SentinelVault Foreground Tracker</string>
+    <string name="accessibility_service_description">Reads only the package name of the active window so SentinelVault can detect when a stranger opens a different app while the device is unlocked. No window content, text or input is collected.</string>
 </resources>

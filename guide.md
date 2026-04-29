@@ -1,8 +1,11 @@
 # SENTINEL VAULT - MASTER DEVELOPMENT GUIDE & AI CONTEXT
 
-- **Version:** 4.1 (Macro Description, Full Architecture, Design System & Routing Included)
-- **Target Platform:** Android (Native Kotlin)
+- **Version:** 4.2 (Epic 4 trigger stack landed, exhaustive product description, deep technical inventory)
+- **Target Platform:** Android (Native Kotlin), `minSdk = 26`, `targetSdk = 34`, `compileSdk = 34`.
+- **JVM Toolchain:** Java 17 source/target; Kotlin `2.2.x`; Android Gradle Plugin `9.x`.
 - **Distribution:** Manual Sideloading (.apk) - No Play Store restrictions.
+- **Runtime Footprint Target:** Cold start ≤ 800 ms on a Pixel 6, idle RSS ≤ 60 MB, average wake-up CPU budget per trigger ≤ 25 ms (camera frame excluded).
+- **Privacy Posture:** Zero network calls, zero analytics SDKs, zero Google Play Services dependency, zero cleartext storage.
 
 ---
 
@@ -20,19 +23,70 @@
 
 ## 1. EXECUTIVE SUMMARY & MACRO DESCRIPTION (WHAT ARE WE BUILDING?)
 
-### The Core Problem
-Traditional mobile security relies on a single point of entry (a PIN or fingerprint to unlock the phone). Once the device is unlocked, it is completely vulnerable. This exposes users to "Insider Threats"—such as a thief snatching an already unlocked phone from your hand on the street, or a partner/friend snooping through your private messages after you handed them the phone to simply watch a video.
+### 1.1 The Core Problem (Insider Threat)
+Traditional mobile security relies on a **single point of entry**: a PIN, pattern or fingerprint that unlocks the device. Once that gate is crossed, every app, message, photo and banking session becomes equally accessible to whoever happens to be holding the phone. The attacker model the industry usually targets — an outsider that recovers a *locked* device — covers a small fraction of the actual day-to-day risk. The much larger attack surface is the **post-unlock** window, where the legitimate owner is the one who unlocked the device but no longer controls it. Concretely:
 
-### The Solution (SentinelVault)
-SentinelVault is an advanced, Edge-AI powered Android security application designed to provide continuous, post-unlock authentication. It acts as a silent guardian that verifies if the person holding the unlocked phone is actually the owner. It operates entirely offline (Zero-Internet Policy) to guarantee absolute privacy and zero cloud costs.
+* **Snatch theft.** A thief grabs the phone *while it is already unlocked*, in front of a coffee shop or at a traffic light, and runs. The biometric/PIN gate has been bypassed because the owner has just opened it.
+* **Voluntary handover, involuntary snooping.** The owner hands the unlocked phone to a friend, partner, child or colleague to "show this video", "make a call", "look at this photo". The recipient then navigates to private chats, banking apps, photo galleries or password vaults.
+* **Shoulder surfing during input.** Someone observes the PIN unlock, then takes the device when the owner is distracted.
+* **Coerced unlock.** The owner is forced to unlock the device under duress and then loses physical control.
 
-### How it works in practice (The User Journey)
+In every case the OS gate is intact, the device is "authenticated", and the OS therefore grants full access. This entire class of attacks is invisible to stock Android.
 
-1. **Enrollment:** The owner installs the app, sets an Admin PIN, and registers their face. The app uses the front camera to extract a mathematical map (128-d vector) of the owner's face. The actual photos are immediately destroyed. Only the math is saved.
-2. **Silent Vigilance (Event-Driven):** The app does not constantly leave the camera on (which would kill the battery). Instead, a background service listens for high-risk "triggers", such as the device being unlocked, a sudden violent movement (snatch detection via accelerometer), or the opening of a sensitive app (like a banking app or WhatsApp).
-3. **Context-Aware Verification:** When triggered, the app silently takes a picture in the background. If it sees the owner, it goes back to sleep. If the owner hands the phone to a friend to watch YouTube, the app detects a stranger but grants a "Context Token" tied to YouTube. If the friend closes YouTube and tries to open WhatsApp (breaching the context), the app flags an intrusion.
-4. **The Investigation Protocol:** If an intruder is suspected, the app enters a 3-minute investigation mode, silently taking a photo every 3 seconds to gather evidence and confirm the stranger's face mathematically.
-5. **Lockdown & Evidence:** Once the intruder is confirmed, the app instantly locks the phone screen at the hardware level (`DevicePolicyManager`), disabling biometric unlock and requiring the master OS password. Simultaneously, it saves the clearest photo of the intruder and a log of which apps they tried to open into a highly encrypted, secret local vault that only the owner can access later.
+### 1.2 The Solution Concept (SentinelVault)
+SentinelVault is a **continuous, post-unlock biometric verifier** that runs entirely on-device. It treats the unlock event as the *start*, not the *end*, of the authentication problem. The application:
+
+1. Holds an **owner facial template** (128-d MobileFaceNet embedding) inside an encrypted local store. Raw photos are wiped from RAM as soon as the embedding is extracted.
+2. Listens to **high-signal device events** (unlock, foreground app change, accelerometer impulse, sensitive-app launch) instead of running the camera continuously, so the battery cost stays in the noise.
+3. On every triggered event, takes a **single silent frame** through the front camera, runs face detection + embedding, and computes the **cosine similarity** to the owner template. If it matches, the user is silently allowed to keep using the device. If it does not, the **3-minute investigation protocol** starts.
+4. During the investigation, frames are sampled every 3 s, an intruder template is built, and the foreground-app trail is recorded.
+5. A confirmed breach triggers **hardware lockdown** (`DevicePolicyManager.lockNow()` + biometric-strong required), saves the sharpest intruder frame and the foreground-app log into the **encrypted vault**, and only the Admin PIN can open the dashboard to review evidence.
+
+The whole pipeline operates **fully offline**: there is no INTERNET permission, no Firebase, no telemetry, no ad SDK, no analytics, no cloud sync. The app cannot leak data even if compromised, because there is no egress channel.
+
+### 1.3 Product Pillars
+| Pillar | Concrete Implication |
+|---|---|
+| **Edge AI only** | TensorFlow Lite (MobileFaceNet INT8) via NNAPI; no Play Services ML Kit, no remote inference. |
+| **Zero network** | `INTERNET` permission deliberately omitted; release builds also enforce `usesCleartextTraffic=false`. |
+| **Zero knowledge of the face** | Bitmaps and intermediate buffers are zeroed and recycled by `MemorySanitizer` before GC can observe them. |
+| **Event-driven** | The camera is never streaming during normal use; Epic 4 triggers gate frame capture. |
+| **Tamper-evident** | `IntegrityManager` verifies the APK signature hash baked at build time against `PackageManager`. |
+| **Sideload-friendly** | No Play Store policies to satisfy, so the app can request `BIND_DEVICE_ADMIN`, `SYSTEM_ALERT_WINDOW`, `PACKAGE_USAGE_STATS` and `BIND_ACCESSIBILITY_SERVICE` without curation. |
+
+### 1.4 End-to-End User Journey (Illustrated)
+1. **First launch — Gatekeeper PIN setup.** A stark dark-mode `PinPadView` asks the owner to define and confirm an Admin PIN (`route_gatekeeper`). The PIN is salted and hashed via PBKDF2-SHA256 (Argon2id ready as a drop-in alternative).
+2. **Onboarding carousel.** `route_onboarding` walks the owner through, in order: Camera permission → `SYSTEM_ALERT_WINDOW` → `PACKAGE_USAGE_STATS` (Settings → Special access) → `BIND_DEVICE_ADMIN` (Activate device admin dialog) → Accessibility toggle. On Android 13+ the carousel detects the "Restricted settings" lockout and deep-links the owner to App Info.
+3. **Enrollment.** `route_enrollment` opens the front camera with an `ArMaskOverlay` (oval mask, green stroke when the face is centred and large enough). The pipeline runs BlazeFace → crop → MobileFaceNet → 128-d FloatArray; the bitmap is wiped and recycled within the same `withContext(Dispatchers.Default)` block.
+4. **Vigilance begins.** SentinelVault retreats to the background. From this moment, *no UI is shown unless the owner returns to the app* or an intrusion is confirmed.
+5. **Daily life — silent verification.** Every unlock fires a single sub-second background frame. If it matches the owner: nothing happens. If a sensitive app opens (banking, messengers, vaults) without a fresh `ContextToken` covering that package, a verification frame is forced.
+6. **Voluntary handover — the Context Token.** The owner unlocks WhatsApp, opens YouTube, hands the phone to a friend. The owner-verified frame mints a `ContextToken("com.google.android.youtube", ttl=5min)`. While the friend stays in YouTube, no further frames are taken. The moment they switch to *any other app*, the token is revoked and a fresh verification frame is taken; switching to a sensitive app raises the alert level immediately.
+7. **Snatch.** The phone is yanked from the owner's hand on the street. The accelerometer registers a peak ≥ 25 m/s² combined with jerk ≥ 80 m/s³ — `SnatchHeuristic` fires, `TriggerEvent.SnatchDetected` propagates, and the state machine enters `ALERT_LEVEL_1` directly (no token can cover a snatch).
+8. **Investigation.** Pulsed sampling at 3-second intervals for 180 seconds (the "3-Minute Protocol"). Each frame's embedding is compared to the owner's template and to the rolling intruder template. Three consecutive owner-mismatches with cosine similarity below the rejection threshold confirm a breach.
+9. **Lockdown.** `DevicePolicyManager.lockNow(KEYGUARD_DISABLE_BIOMETRICS)` forces the OS keyguard back, requires the master OS password, and disables biometric unlock for the next session. A `SYSTEM_ALERT_WINDOW` overlay greys the screen with a deterrent message in the meantime. The hero frame (sharpest of the investigation) and the foreground-app trail are persisted as an `EventLogEntity` of type `BREACH_CONFIRMED`.
+10. **Forensics.** When the owner returns to the app, they pass `route_gatekeeper`, land on `route_dashboard`, see a chronological list of `EventCard`s, and can drill into `route_incident_detail/{id}` to view the intruder photo and the apps they attempted to open.
+
+### 1.5 What SentinelVault Is **Not** (Out of Scope)
+* Not a replacement for the OS lock screen — it complements it.
+* Not a remote anti-theft service — there is no "find my phone", no SIM monitoring, no remote wipe (those require network).
+* Not a cloud face-recognition service — embeddings never leave the device.
+* Not a parental-control product — it does not block apps, only flags identity mismatches.
+* Not a backup product — vault contents are intentionally non-exportable so that stolen unlocked devices cannot exfiltrate them.
+
+### 1.6 Operating Modes
+| Mode | Trigger | Behaviour |
+|---|---|---|
+| `IDLE` | Default | Listening only; camera completely off. |
+| `VERIFY_ONCE` | `UserPresent`, sensitive-app open without active token, foreground change after token expiry | Single silent frame, passes/fails silently. |
+| `ALERT_LEVEL_1` | Mismatched verify, snatch detected, context breach | Pulsed sampling at 3 s for ≤ 90 s. One owner-match downgrades back to `IDLE`. |
+| `ALERT_LEVEL_2` | Two consecutive mismatches in `ALERT_LEVEL_1` | Continues pulsed sampling but pre-arms the overlay so latency-to-lock is ≤ 200 ms. |
+| `BREACH_CONFIRMED` | Three consecutive mismatches | Hardware lockdown, vault write, transition back to `IDLE` only after owner unlocks the OS keyguard. |
+
+### 1.7 Detailed Threat Model
+* **In-scope adversary capabilities:** physical possession of the unlocked device for ≤ 5 minutes, knowledge of the owner's face only from photos (presentation attack), ability to install no apps, ability to open any installed app.
+* **Out-of-scope adversary capabilities:** root access, custom recovery flashing, JTAG/eMMC dumping, ADB with USB debugging enabled (the owner is expected to keep developer options off).
+* **Defended events:** snatch theft, voluntary-handover snooping, shoulder-surfed PIN reuse, coerced unlock followed by walk-away.
+* **Residual risks:** the owner unlocks AND the attacker mimics the owner's face within the rejection threshold (mitigated by liveness probe in Epic 5: rejecting flat / printed frames).
 
 ---
 
@@ -51,12 +105,124 @@ SentinelVault is an advanced, Edge-AI powered Android security application desig
 
 ## 3. TECH STACK & PERFORMANCE
 
-- **Core:** Kotlin, Coroutines, StateFlow.
-- **Frontend:** Jetpack Compose (Material Design 3). Single-Activity Architecture.
-- **Computer Vision:** CameraX (`ImageAnalysis`).
-- **Machine Learning:** TensorFlow Lite (MobileFaceNet INT8) via NNAPI.
-- **Database & Persistence:** Room Database with SQLCipher.
-- **Memory Hygiene:** `ImageProxy`s and `Bitmap`s MUST be recycled explicitly (`.close()`). TFLite inference MUST run on `Dispatchers.Default`.
+### 3.1 Languages & Build
+- **Kotlin** `2.2.x` with the Compose compiler plugin; **JVM target 17**.
+- **Android Gradle Plugin** `9.x`, **KSP** for annotation processing (Hilt + Room).
+- **Gradle Version Catalog** (`gradle/libs.versions.toml`) is the single source of truth for every dependency version.
+
+### 3.2 Concurrency
+- **Coroutines** for all async work; `StateFlow` / `SharedFlow` for reactive state.
+- **Dispatcher policy:**
+  - `Dispatchers.Default` for CPU-bound TFLite inference (forced inside `EnrollmentRepository.enroll`).
+  - `Dispatchers.IO` for SQLCipher transactions and file I/O.
+  - `Dispatchers.Main.immediate` for Compose state updates.
+  - `Dispatchers.Unconfined` is **forbidden** outside test code.
+- **Backpressure:** the trigger bus (`TriggerOrchestrator`) uses a `MutableSharedFlow` with `replay = 1`, `extraBufferCapacity = 64`, `BufferOverflow.DROP_OLDEST` so a slow consumer can never stall a 50 Hz `SensorEventListener`.
+
+### 3.3 Frontend
+- **Jetpack Compose** (Material 3) — single-activity architecture (`MainActivity` only).
+- **Navigation:** Jetpack Compose Navigation 2.8.x with locked routes (see §5).
+- **Hilt** for DI everywhere (`@HiltAndroidApp`, `@AndroidEntryPoint` for `MainActivity`, the `UserPresentReceiver` and `SentinelAccessibilityService`).
+
+### 3.4 Computer Vision & ML
+- **CameraX 1.3.x** (`ImageAnalysis` + `BackpressureStrategy.STRATEGY_KEEP_ONLY_LATEST`).
+- **YUV → ARGB** conversion via the in-house `FrameAnalyzer.toRotatedArgbBitmap` (NV21 → JPEG → Bitmap; rotates by `ImageInfo.rotationDegrees`).
+- **TensorFlow Lite 2.16.x** with `tensorflow-lite-support 0.4.x` for NormalizeOp / ResizeOp helpers.
+- **Models (assets, not bundled in the repo):**
+  - `face_detection_short_range.tflite` (BlazeFace, ~230 KB) — single-face detection, score threshold ≥ 0.6.
+  - `mobilefacenet_int8.tflite` (~1.2 MB) — 112×112 input, 128-d L2-normalised output.
+- **Hardware acceleration:** NNAPI delegate first; CPU fallback if the device returns `NNAPI_ERROR`. GPU delegate intentionally avoided (cold-start cost outweighs benefit for sub-second pulses).
+
+### 3.5 Persistence
+- **Room 2.7.x** with **SQLCipher 4.6.x** (`net.zetetic:sqlcipher-android`).
+- The SQLCipher passphrase is generated by `KeystoreManager` (AES-256 GCM) and only ever materialised into a `ByteArray` long enough for `SupportOpenHelperFactory` to mount the database.
+- Schemas are exported to `app/schemas/` (KSP `room.schemaLocation` arg).
+
+### 3.6 Sensors & System Integrations (Epic 4)
+- **`SensorManager`** — `TYPE_LINEAR_ACCELERATION` (preferred), falling back to `TYPE_ACCELEROMETER`. Sample rate `SENSOR_DELAY_GAME` (≈ 20 ms ≈ 50 Hz).
+- **`UsageStatsManager`** — pull-based foreground tracker; queries `MOVE_TO_FOREGROUND` / `ACTIVITY_RESUMED` events in a 5 s sliding window.
+- **`AccessibilityService`** — push-based foreground tracker, registered with `typeWindowStateChanged` and `canRetrieveWindowContent="false"` to make it explicit that we never read window content.
+- **`BroadcastReceiver`** — manifest-registered for `ACTION_USER_PRESENT` (allowed by the implicit-broadcast exception list since Android 8).
+
+### 3.7 Memory Hygiene (Hard Rules)
+- Every `ImageProxy` MUST be `.close()`'d through `MemorySanitizer.close()`.
+- Every `Bitmap` MUST be passed through `MemorySanitizer.recycle()`; mutable bitmaps are first overwritten with `eraseColor(0)`.
+- Every owner-derived `FloatArray` MUST be zeroed via `MemorySanitizer.zero()` after persistence.
+- TFLite inference MUST run on `Dispatchers.Default`; never on the main thread, never on the camera analyser thread.
+
+### 3.8 Performance Budgets
+| Operation | Budget | Measured on |
+|---|---|---|
+| Cold start to `route_gatekeeper` | ≤ 800 ms | Pixel 6 / Android 14 |
+| One verification pulse (capture → embed → cosine) | ≤ 350 ms | Pixel 6 / NNAPI |
+| Snatch trigger latency (sensor → bus emit) | ≤ 5 ms | Pixel 6 |
+| Foreground change (Accessibility path) | ≤ 50 ms | Pixel 6 |
+| Foreground change (UsageStats path) | ≤ 500 ms | Pixel 6 |
+| `DevicePolicyManager.lockNow()` to keyguard visible | ≤ 200 ms | Pixel 6 |
+
+---
+
+## 3B. RUNTIME ARCHITECTURE & MODULE INVENTORY
+
+```
+com.sentinelvault
+├── SentinelApp              @HiltAndroidApp - process entry point
+├── MainActivity             @AndroidEntryPoint - hosts SentinelNavHost
+├── data/
+│   ├── auth/                Admin PIN credential storage
+│   └── db/
+│       ├── SentinelDatabase Room + SQLCipher root
+│       ├── DatabaseKeyProvider  passphrase mint via Keystore
+│       ├── converter/Converters  FloatArray ↔ BLOB
+│       ├── dao/EmbeddingDao     owner 128-d vector
+│       ├── dao/EventLogDao      breach timeline
+│       └── entity/{Embedding,EventLog}Entity
+├── di/
+│   ├── AuthModule, DatabaseModule, FaceModule, SecurityModule, TriggerModule
+├── face/
+│   ├── FaceDetector / TfLiteFaceDetector / NoOpFaceDetector
+│   ├── FaceEmbedder / TfLiteFaceEmbedder / NoOpFaceEmbedder
+│   ├── EnrollmentRepository  pipeline: detect → embed → persist → sanitize
+│   ├── FrameAnalyzer        CameraX ImageAnalysis adapter (YUV → ARGB)
+│   └── TfLiteAssets         memory-mapped model loader
+├── security/
+│   ├── IntegrityManager     APK signature hash check vs BuildConfig
+│   ├── KeystoreManager      AES-256 GCM via Android Keystore
+│   ├── MemorySanitizer      zero() / recycle() / close() helpers
+│   ├── PinHasher            PBKDF2-SHA256 (Argon2 ready)
+│   └── admin/SentinelDeviceAdminReceiver
+├── triggers/                ─── Epic 4 ─────────────────────────────
+│   ├── TriggerEvent         sealed: UserPresent / ForegroundAppChanged /
+│   │                                SensitiveAppOpened / SnatchDetected /
+│   │                                ContextBreach
+│   ├── TriggerOrchestrator  SharedFlow bus (replay=1, drop-oldest, 64-buf)
+│   ├── TriggerClock         injectable time source (deterministic in tests)
+│   ├── UserPresentReceiver  manifest receiver for ACTION_USER_PRESENT
+│   ├── ForegroundAppTracker interface + UsageStatsForegroundTracker (poll)
+│   ├── SentinelAccessibilityService  push-based foreground tracker
+│   ├── SnatchHeuristic      magnitude + jerk + refractory algorithm (pure)
+│   ├── MotionTriggerDetector SensorEventListener bridge
+│   ├── ContextToken         immutable ticket, ttl-aware
+│   ├── ContextTokenManager  thread-safe state holder + breach emitter
+│   └── SensitiveAppRegistry curated bank/messenger/vault package allowlist
+└── ui/
+    ├── theme/               SentinelTheme (Material 3, dark-only tokens)
+    ├── components/          PinPadView, SecurityButton, EventCard, ArMaskOverlay
+    ├── navigation/          Routes + SentinelNavHost
+    ├── gatekeeper/, onboarding/, enrollment/, dashboard/, incident/
+```
+
+### Trigger Pipeline Sequence
+
+```
+[ACTION_USER_PRESENT]──┐
+[AccessibilityService]─┼─► TriggerOrchestrator.events ──► (Epic 5) StateMachine
+[UsageStats poller] ───┤        ▲                                │
+[MotionTriggerDetector]┘        │                                ▼
+[ContextTokenManager] ──────────┘                          CameraX pulse
+```
+
+Every producer is a `@Singleton` injected by `TriggerModule`; consumers (the Epic 5 state machine and the dashboard live counters) collect from `TriggerOrchestrator.events` on `Dispatchers.Default`.
 
 ---
 
@@ -106,14 +272,51 @@ Use standard Jetpack Compose Navigation (`NavHost`). The following string routes
   - `EventLogDao.insertBreach(log: EventLog)`: Records the intrusion.
   - `EventLogDao.getIncidentTimeline()`: Returns `Flow<List<Incident>>` for the Dashboard.
 
+### 6.1 Trigger Bus (Epic 4)
+
+Producers (each `@Singleton`, all in `com.sentinelvault.triggers`):
+
+| Producer | Source | Emits |
+|---|---|---|
+| `UserPresentReceiver` | `Intent.ACTION_USER_PRESENT` | `TriggerEvent.UserPresent` |
+| `SentinelAccessibilityService` | `TYPE_WINDOW_STATE_CHANGED` | `TriggerEvent.ForegroundAppChanged` (+ delegates to `ContextTokenManager`) |
+| `UsageStatsForegroundTracker` | Polled by orchestrator | Resolved package name (orchestrator wraps it into `ForegroundAppChanged`) |
+| `MotionTriggerDetector` | `SensorManager` linear-acceleration | `TriggerEvent.SnatchDetected` |
+| `ContextTokenManager` | `onForegroundAppChanged` calls | `TriggerEvent.SensitiveAppOpened`, `TriggerEvent.ContextBreach` |
+
+Single consumer for now: the Epic 5 state machine collects `TriggerOrchestrator.events` on `Dispatchers.Default` and decides whether to spend a verification frame. Future consumers (live dashboard counters, debug logs) are append-only — the bus tolerates many subscribers.
+
+### 6.2 Context Token Lifecycle (Epic 4)
+
+```
+                      ┌────────────────────────────────────────┐
+                      │  owner verified while pkg=P foreground │
+                      └────────────────────────┬───────────────┘
+                                               │ ContextTokenManager.issue(P)
+                                               ▼
+        ┌───────────────────── token{P, ttl=5min} ─────────────────────┐
+        │                                                              │
+        │ onForegroundAppChanged(Q)                                    │
+        │   ├── Q == P                  → token unchanged              │
+        │   ├── token expired            → token = null                │
+        │   ├── Q ∈ SensitiveAppRegistry → emit SensitiveAppOpened     │
+        │   │                            +  emit ContextBreach         │
+        │   │                            +  token = null               │
+        │   └── otherwise               → emit ContextBreach           │
+        │                                +  token = null               │
+        └──────────────────────────────────────────────────────────────┘
+```
+
 ---
 
 ## 7. OPEN-SOURCE SECURITY STANDARD
 
-- **Root of Trust:** Admin PIN hashed via Argon2/PBKDF2.
-- **Keystore Integration:** SQLCipher keys generated and stored via Android Keystore System.
-- **Zero-Knowledge:** Enrollment photos MUST be overwritten with zeros and destroyed.
-- **Runtime Integrity:** App verifies its own APK signature hash via `local.properties`.
+- **Root of Trust:** Admin PIN hashed via PBKDF2-SHA256 (Argon2id ready as a drop-in via the `PinHasher` interface).
+- **Keystore Integration:** SQLCipher passphrase generated by `KeystoreManager` (AES-256 GCM); the key alias is application-private and the key requires user authentication on Android 11+.
+- **Zero-Knowledge:** Enrollment photos and intermediate buffers MUST be wiped via `MemorySanitizer.zero()` / `recycle()` before returning from the inference scope.
+- **Runtime Integrity:** `IntegrityManager` verifies the APK signing certificate SHA-256 against the constant baked into `BuildConfig.APK_SIGNATURE_SHA256` (sourced from `local.properties` or `APK_SIGNATURE_SHA256` env var). Mismatch is treated as repackaging.
+- **Permission Minimisation:** every permission requested is justified in §3.6 and §6.1; `INTERNET` is **explicitly absent**; `QUERY_ALL_PACKAGES` is required to translate package names into human-readable app labels for the dashboard.
+- **Backup Disabled:** `android:allowBackup="false"`, `android:fullBackupContent="false"` and a `data_extraction_rules.xml` that excludes everything ensure ADB backup cannot exfiltrate the encrypted database.
 
 ---
 
@@ -166,13 +369,13 @@ Use standard Jetpack Compose Navigation (`NavHost`). The following string routes
 ### EPIC 4: Event-Driven Triggers & Context Token
 **Goal:** Listen to physical state and app usage.
 
-- [ ] **Task 4.1:** Passive System Triggers
-  - [ ] `BroadcastReceiver` for `ACTION_USER_PRESENT`.
-  - [ ] Foreground tracking via `AccessibilityService`/`UsageStatsManager`.
-- [ ] **Task 4.2:** Active Triggers & Context Token
-  - [ ] `SensorManager` Snatch/Angle heuristic algorithm.
-  - [ ] Implement Context Token logic (bind to active app).
-- [ ] **Epic 4 Tests:** Mock `SensorEvent` arrays, simulate app switches for token validation.
+- [x] **Task 4.1:** Passive System Triggers
+  - [x] `BroadcastReceiver` for `ACTION_USER_PRESENT` (`UserPresentReceiver`, manifest-registered, Hilt-injected).
+  - [x] Foreground tracking via `AccessibilityService` (`SentinelAccessibilityService`, push-based) **and** `UsageStatsManager` (`UsageStatsForegroundTracker`, pull-based fallback).
+- [x] **Task 4.2:** Active Triggers & Context Token
+  - [x] `SensorManager` Snatch heuristic algorithm (`SnatchHeuristic`: magnitude + jerk + refractory window; `MotionTriggerDetector` adapter).
+  - [x] Context Token logic (`ContextToken`, `ContextTokenManager`, `SensitiveAppRegistry`) — binds trust to the active app, ages out after 5 minutes, escalates sensitive-app launches.
+- [x] **Epic 4 Tests:** `SnatchHeuristicTest` (synthetic `SensorEvent` arrays for impulse/ramp/refractory cases), `ContextTokenManagerTest` (simulated app switches, sensitive-app escalation, expiry), `UsageStatsForegroundTrackerTest` (mocked `UsageEvents` iterator), `TriggerOrchestratorTest` (replay & ordering).
 
 ---
 
