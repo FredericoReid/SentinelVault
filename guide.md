@@ -408,38 +408,34 @@ Single consumer for now: the Epic 5 state machine collects `TriggerOrchestrator.
 ### EPIC 7: Vault Dashboard & Storage Management
 **Goal:** The Admin UI (`route_dashboard`, `route_incident_detail`).
 
-- [ ] **Task 7.1:** Storage Management
-  - [ ] WebP compression & Hero Frame selection.
-  - [ ] FIFO Ring Buffer logic (1.5GB limit).
-- [ ] **Task 7.2:** Dashboard UI
-  - [ ] Build `route_dashboard` using `EventCard`.
-  - [ ] Build `route_incident_detail`.
-- [ ] **Epic 7 Tests:** Mock 1.6GB data for FIFO validation.
+- [x] **Task 7.1:** Storage Management
+  - [x] WebP compression & Hero Frame selection.
+  - [x] FIFO Ring Buffer logic (1.5GB limit).
+- [x] **Task 7.2:** Dashboard UI
+  - [x] Build `route_dashboard` using `EventCard`.
+  - [x] Build `route_incident_detail`.
+- [x] **Epic 7 Tests:** Mock 1.6GB data for FIFO validation.
 
 ---
 
-## 9. TECHNICAL DEBT BACKLOG
+### EPIC 8: Deprecation Cleanup & AGP 10 Readiness
+**Goal:** Resolve the non-blocking warnings that surfaced after the bump to `compileSdk = 36` / `targetSdk = 36` and Compose BOM `2026.04.01`. Each item is opt-in tech debt: the build is green, the APK installs and runs, but the deprecated APIs will be removed in AGP 10 / a future Android release. Address before the next major SDK bump.
 
-Non-blocking warnings that surfaced after the bump to `compileSdk = 36` / `targetSdk = 36` and Compose BOM `2026.04.01`. Each item is opt-in tech debt: the build is green, the APK installs and runs, but the deprecated APIs will be removed in AGP 10 / a future Android release. Address before the next major SDK bump.
-
-### 9.1 Android 15+ Edge-to-Edge Enforcement
-- [ ] **Theme.kt** — replace `window.statusBarColor` / `window.navigationBarColor` writes with `WindowCompat.setDecorFitsSystemWindows(window, false)` plus `Modifier.systemBarsPadding()` / `Scaffold` insets. Both setters are no-ops on `targetSdk = 35+`.
-- [ ] **LayoutParamsFactory.kt** — drop `WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR` from the lockdown overlay flags (deprecated since API 30, ignored from API 35).
-
-### 9.2 Foreground / Usage APIs
-- [ ] **UsageStatsForegroundTracker.kt** + **UsageStatsForegroundTrackerTest.kt** — migrate `UsageEvents.Event.MOVE_TO_FOREGROUND` / `MOVE_TO_BACKGROUND` to `ACTIVITY_RESUMED` / `ACTIVITY_PAUSED` (Android 10+ replacement, same semantics).
-- [ ] **PermissionsCoordinator.kt** — replace `AppOpsManager.unsafeCheckOpNoThrow(...)` with `unsafeCheckOpNoThrow(op, uid, packageName)` overload that takes an `AttributionSource`, or fall back to `checkOpNoThrow` gated by SDK level.
-
-### 9.3 AGP 9 → 10 DSL Migration
-- [ ] **app/build.gradle.kts** — migrate `kotlinOptions { jvmTarget = "17" }` to the `compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }` DSL (KT-49746).
-- [ ] **app/build.gradle.kts** — replace the top-level `android { ... }` block configured via `BaseAppModuleExtension` with `com.android.build.api.dsl.ApplicationExtension` (will become the only supported DSL in AGP 10).
-- [ ] **build infrastructure** — audit any caller of `applicationVariants` / `testVariants` / `unitTestVariants` and port to `AndroidComponentsExtension` (currently no internal callers; warning is emitted by a transitive plugin).
-
-### 9.4 Kotlin 2.x Annotation Targets (KT-73255)
-- [ ] **DatabaseKeyProvider.kt** + **DefaultDevicePolicyController.kt** — qualify the constructor-injected annotations with the explicit `@param:` site (e.g. `@param:ApplicationContext`) to keep the current "value parameter only" semantics, or opt into the future default with `-Xannotation-default-target=param-property` in the Kotlin compiler args.
-
-### 9.5 LiteRT Namespace Collision
-- [ ] **gradle/libs.versions.toml** — track upstream fix for `com.google.ai.edge.litert:litert-support` and `litert-support-api` sharing the `org.tensorflow.lite.support` namespace (manifest-merger warning, no runtime impact).
+- [ ] **Task 8.1:** Android 15+ Edge-to-Edge Enforcement
+  - [ ] **Theme.kt** — replace `window.statusBarColor` / `window.navigationBarColor` writes with `WindowCompat.setDecorFitsSystemWindows(window, false)` plus `Modifier.systemBarsPadding()` / `Scaffold` insets. Both setters are no-ops on `targetSdk = 35+`.
+  - [ ] **LayoutParamsFactory.kt** — drop `WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR` from the lockdown overlay flags (deprecated since API 30, ignored from API 35).
+- [ ] **Task 8.2:** Foreground / Usage APIs
+  - [ ] **UsageStatsForegroundTracker.kt** + **UsageStatsForegroundTrackerTest.kt** — migrate `UsageEvents.Event.MOVE_TO_FOREGROUND` / `MOVE_TO_BACKGROUND` to `ACTIVITY_RESUMED` / `ACTIVITY_PAUSED` (Android 10+ replacement, same semantics).
+  - [ ] **PermissionsCoordinator.kt** — replace `AppOpsManager.unsafeCheckOpNoThrow(...)` with the `unsafeCheckOpNoThrow(op, uid, packageName)` overload that takes an `AttributionSource`, or fall back to `checkOpNoThrow` gated by SDK level.
+- [ ] **Task 8.3:** AGP 9 → 10 DSL Migration
+  - [ ] **app/build.gradle.kts** — migrate `kotlinOptions { jvmTarget = "17" }` to the `compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }` DSL (KT-49746).
+  - [ ] **app/build.gradle.kts** — replace the top-level `android { ... }` block configured via `BaseAppModuleExtension` with `com.android.build.api.dsl.ApplicationExtension` (will become the only supported DSL in AGP 10).
+  - [ ] **build infrastructure** — audit any caller of `applicationVariants` / `testVariants` / `unitTestVariants` and port to `AndroidComponentsExtension` (currently no internal callers; warning is emitted by a transitive plugin).
+- [ ] **Task 8.4:** Kotlin 2.x Annotation Targets (KT-73255)
+  - [ ] **DatabaseKeyProvider.kt** + **DefaultDevicePolicyController.kt** — qualify the constructor-injected annotations with the explicit `@param:` site (e.g. `@param:ApplicationContext`) to keep the current "value parameter only" semantics, or opt into the future default with `-Xannotation-default-target=param-property` in the Kotlin compiler args.
+- [ ] **Task 8.5:** LiteRT Namespace Collision
+  - [ ] **gradle/libs.versions.toml** — track upstream fix for `com.google.ai.edge.litert:litert-support` and `litert-support-api` sharing the `org.tensorflow.lite.support` namespace (manifest-merger warning, no runtime impact).
+- [ ] **Epic 8 Tests:** re-run `:app:testDebugUnitTest` and `:app:assembleDebug` after each task; confirm no new warnings are introduced and the existing 187-test suite stays green.
 
 ---
 
