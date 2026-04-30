@@ -72,6 +72,7 @@ class VigilanceStateMachine @Inject constructor(
         when (plan) {
             is Plan.VerifyNow -> runSinglePulse(plan.reason, scope)
             is Plan.EnterAlert -> startAlertLoop(plan.atMs, scope)
+            is Plan.EnterAlertAndVerify -> enterAlertAndVerify(plan.atMs, scope)
         }
     }
 
@@ -87,6 +88,8 @@ class VigilanceStateMachine @Inject constructor(
             }
             is TriggerEvent.ContextBreach -> Plan.VerifyNow(VerifyReason.ContextBreach)
             is TriggerEvent.SnatchDetected -> Plan.EnterAlert(event.timestampMs)
+            is TriggerEvent.DeskLiftDetected -> Plan.EnterAlertAndVerify(event.timestampMs)
+            is TriggerEvent.DeviceUpright -> Plan.VerifyNow(VerifyReason.DeviceUpright)
             is TriggerEvent.ForegroundAppChanged -> null
         }
     }
@@ -101,6 +104,13 @@ class VigilanceStateMachine @Inject constructor(
     private fun startAlertLoop(atMs: Long, scope: CoroutineScope) {
         _state.value = VigilanceState.AlertLevel1(sinceMs = atMs, mismatchStreak = 0)
         ensurePulseJob(scope)
+    }
+
+    private suspend fun enterAlertAndVerify(atMs: Long, scope: CoroutineScope) {
+        startAlertLoop(atMs, scope)
+        val outcome = engine.verifyOnce(clock.nowMs())
+        _verdicts.emit(outcome)
+        stateMutex.withLock { applyOutcome(outcome, scope) }
     }
 
     private fun ensurePulseJob(scope: CoroutineScope) {
@@ -156,5 +166,6 @@ class VigilanceStateMachine @Inject constructor(
     private sealed interface Plan {
         data class VerifyNow(val reason: VerifyReason) : Plan
         data class EnterAlert(val atMs: Long) : Plan
+        data class EnterAlertAndVerify(val atMs: Long) : Plan
     }
 }

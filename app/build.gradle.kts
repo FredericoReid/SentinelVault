@@ -1,3 +1,5 @@
+import com.android.build.api.dsl.ApplicationExtension
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 plugins {
@@ -17,7 +19,9 @@ val apkSignatureSha256: String =
         ?: System.getenv("APK_SIGNATURE_SHA256")
         ?: "00000000000000000000000000000000000000000000000000000000DEADBEEF"
 
-android {
+// AGP 10 will only expose the public `ApplicationExtension` DSL; configuring through it
+// today already removes the `BaseAppModuleExtension` deprecation warning.
+configure<ApplicationExtension> {
     namespace = "com.sentinelvault"
     compileSdk = 36
 
@@ -52,9 +56,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -65,6 +66,10 @@ android {
             excludes += "/META-INF/DEPENDENCIES"
         }
     }
+    androidResources {
+        @Suppress("UnstableApiUsage")
+        noCompress += "tflite"
+    }
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }
@@ -72,9 +77,24 @@ android {
     sourceSets.getByName("androidTest").assets.srcDir("$projectDir/schemas")
 }
 
+// Kotlin 2.x replacement for the deprecated `android.kotlinOptions { jvmTarget = "17" }` DSL.
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
     arg("room.incremental", "true")
+}
+
+// Epic 9 / Task 9.8 (BUG-9.7): on CI, force a clean before any build so a stale
+// `transformDebugClassesWithAsm` cache cannot resurrect missing `_GeneratedInjector`
+// classes. Local incremental builds stay fast — the guard only fires when the standard
+// `CI` env var is set (GitHub Actions, GitLab, etc.).
+if (System.getenv("CI") != null) {
+    tasks.matching { it.name == "preBuild" }.configureEach { dependsOn("clean") }
 }
 
 dependencies {
@@ -83,6 +103,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.lifecycle.service)
     implementation(libs.androidx.activity.compose)
     implementation(libs.kotlinx.coroutines.android)
 

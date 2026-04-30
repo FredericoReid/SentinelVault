@@ -155,6 +155,22 @@ class VigilanceStateMachineTest {
     }
 
     @Test
+    fun `desk lift enters alert and spends an immediate verification pulse`() = runTest(dispatcher) {
+        val f = fixture()
+
+        f.orchestrator.emit(
+            TriggerEvent.DeskLiftDetected(
+                fromFaceDown = false,
+                pickupAccelerationMs2 = 2.4f,
+                timestampMs = 1L
+            )
+        )
+
+        assertThat(f.machine.state.value).isInstanceOf(VigilanceState.AlertLevel1::class.java)
+        assertThat(f.engine.calls).isEqualTo(1)
+    }
+
+    @Test
     fun `sensitive-app open is suppressed when context token covers it`() = runTest(dispatcher) {
         val f = fixture()
         f.tokens.issue("com.whatsapp")

@@ -4,7 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 /**
- * Owner facial embedding (128-d MobileFaceNet vector). The original photo is destroyed
+ * Owner facial embedding (192-d MobileFaceNet vector). The original photo is destroyed
  * immediately after extraction (see [com.sentinelvault.security] / Epic 3).
  */
 @Entity(tableName = "embedding")
@@ -15,7 +15,7 @@ data class EmbeddingEntity(
 ) {
     companion object {
         const val OWNER_ID: Long = 1L
-        const val VECTOR_SIZE: Int = 128
+        const val VECTOR_SIZE: Int = 192
     }
 
     override fun equals(other: Any?): Boolean {

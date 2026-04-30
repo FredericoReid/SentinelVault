@@ -1,6 +1,7 @@
 package com.sentinelvault.ui.onboarding
 
 import android.Manifest
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +58,9 @@ fun OnboardingScreen(
     val cameraLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { refreshTick++ }
+    val notificationsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refreshTick++ }
     val genericSettingsLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { refreshTick++ }
@@ -76,11 +80,22 @@ fun OnboardingScreen(
                 OnboardingPageContent(
                     page = page,
                     granted = isPageSatisfied(page, statuses),
+                    extraBody = if (page == OnboardingPage.BatteryExemption)
+                        OemBatteryInstructions.resolve(context) else null,
                     onCta = {
                         runCta(
                             page = page,
                             context = context,
                             requestCamera = { cameraLauncher.launch(Manifest.permission.CAMERA) },
+                            requestNotifications = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    notificationsLauncher.launch(
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    )
+                                } else {
+                                    refreshTick++
+                                }
+                            },
                             launchSettings = { intent -> genericSettingsLauncher.launch(intent) },
                             onFinished = onCompleted
                         )
@@ -118,30 +133,56 @@ fun OnboardingScreen(
 private fun OnboardingPageContent(
     page: OnboardingPage,
     granted: Boolean,
+    extraBody: String?,
     onCta: () -> Unit
 ) {
+    val context = LocalContext.current
+    val (title, body, ctaLabel) = when (page) {
+        OnboardingPage.BatteryExemption -> Triple(
+            context.getString(com.sentinelvault.R.string.onboarding_battery_title),
+            context.getString(com.sentinelvault.R.string.onboarding_battery_body),
+            context.getString(com.sentinelvault.R.string.onboarding_battery_cta)
+        )
+        OnboardingPage.Notifications -> Triple(
+            context.getString(com.sentinelvault.R.string.onboarding_notifications_title),
+            context.getString(com.sentinelvault.R.string.onboarding_notifications_body),
+            context.getString(com.sentinelvault.R.string.onboarding_notifications_cta)
+        )
+        else -> Triple(page.title, page.body, page.ctaLabel)
+    }
     Column(
         modifier = Modifier.fillMaxSize().padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
-            text = page.title,
+            text = title,
             style = MaterialTheme.typography.headlineLarge,
             color = MaterialTheme.colorScheme.onBackground
         )
         Spacer(Modifier.height(16.dp))
         Text(
-            text = page.body,
+            text = body,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onBackground
         )
+        if (extraBody != null) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = extraBody,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
         Spacer(Modifier.height(24.dp))
-        if (page.ctaLabel.isNotEmpty()) {
+        if (ctaLabel.isNotEmpty()) {
             SecurityButton(
-                text = if (granted) "Granted \u2713" else page.ctaLabel,
+                text = if (granted) "Granted \u2713" else ctaLabel,
                 onClick = onCta,
-                enabled = !granted || page == OnboardingPage.RestrictedSettings || page == OnboardingPage.Done,
+                enabled = !granted ||
+                    page == OnboardingPage.RestrictedSettings ||
+                    page == OnboardingPage.Done ||
+                    page == OnboardingPage.BatteryExemption,
                 modifier = Modifier.testTag(ONBOARDING_CTA_TAG)
             )
         }

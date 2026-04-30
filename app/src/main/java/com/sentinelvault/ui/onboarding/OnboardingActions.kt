@@ -7,14 +7,18 @@ internal data class PermissionStatuses(
     val camera: Boolean,
     val overlay: Boolean,
     val usageStats: Boolean,
-    val deviceAdmin: Boolean
+    val deviceAdmin: Boolean,
+    val batteryExempt: Boolean,
+    val notifications: Boolean
 )
 
 internal fun collectStatuses(context: Context): PermissionStatuses = PermissionStatuses(
     camera = PermissionsCoordinator.isCameraGranted(context),
     overlay = PermissionsCoordinator.isOverlayGranted(context),
     usageStats = PermissionsCoordinator.isUsageStatsGranted(context),
-    deviceAdmin = PermissionsCoordinator.isDeviceAdminGranted(context)
+    deviceAdmin = PermissionsCoordinator.isDeviceAdminGranted(context),
+    batteryExempt = PermissionsCoordinator.isBatteryOptimisationIgnored(context),
+    notifications = PermissionsCoordinator.isPostNotificationsGranted(context)
 )
 
 internal fun isPageSatisfied(page: OnboardingPage, s: PermissionStatuses): Boolean = when (page) {
@@ -24,6 +28,8 @@ internal fun isPageSatisfied(page: OnboardingPage, s: PermissionStatuses): Boole
     OnboardingPage.UsageStats -> s.usageStats
     OnboardingPage.Accessibility -> false
     OnboardingPage.DeviceAdmin -> s.deviceAdmin
+    OnboardingPage.BatteryExemption -> s.batteryExempt
+    OnboardingPage.Notifications -> s.notifications
     OnboardingPage.RestrictedSettings -> false
     OnboardingPage.Done -> true
 }
@@ -32,6 +38,7 @@ internal fun runCta(
     page: OnboardingPage,
     context: Context,
     requestCamera: () -> Unit,
+    requestNotifications: () -> Unit,
     launchSettings: (Intent) -> Unit,
     onFinished: () -> Unit
 ) {
@@ -47,6 +54,9 @@ internal fun runCta(
                 explanation = "SentinelVault needs admin rights to lock the screen on intrusion."
             )
         )
+        OnboardingPage.BatteryExemption ->
+            launchSettings(PermissionsCoordinator.batteryOptimisationIntent(context))
+        OnboardingPage.Notifications -> requestNotifications()
         OnboardingPage.RestrictedSettings -> launchSettings(PermissionsCoordinator.appInfoIntent(context))
         OnboardingPage.Done -> onFinished()
     }

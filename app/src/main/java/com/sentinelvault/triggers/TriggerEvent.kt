@@ -9,6 +9,7 @@ package com.sentinelvault.triggers
  *  * [ForegroundAppChanged] – top activity changed (UsageStats / AccessibilityService).
  *  * [SensitiveAppOpened] – top activity matched the [SensitiveAppRegistry].
  *  * [SnatchDetected] – accelerometer crossed the snatch threshold ([SnatchHeuristic]).
+ *  * [DeskLiftDetected] – device was picked up from a stable desk pose.
  *  * [ContextBreach] – foreground app diverged from the [ContextToken] holder.
  *
  *  All events are immutable and carry a wall-clock timestamp so the orchestrator can
@@ -36,9 +37,30 @@ sealed interface TriggerEvent {
         override val timestampMs: Long
     ) : TriggerEvent
 
+    /**
+     * The phone was resting flat on a table (display up or display down) and was then picked up.
+     * This is stronger than a mere tilt because the detector requires both a stable desk pose and
+     * a pickup impulse before the flatness breaks.
+     */
+    data class DeskLiftDetected(
+        val fromFaceDown: Boolean,
+        val pickupAccelerationMs2: Float,
+        override val timestampMs: Long
+    ) : TriggerEvent
+
     data class ContextBreach(
         val tokenPackage: String,
         val attemptedPackage: String,
+        override val timestampMs: Long
+    ) : TriggerEvent
+
+    /**
+     * The phone has been raised from a flat / pocket pose into an upright (portrait-held)
+     * pose. Emitted by [UprightTriggerDetector] after a debounce + cooldown so the trigger
+     * does not fan out a verification pulse on every micro-tilt.
+     */
+    data class DeviceUpright(
+        val pitchDegrees: Float,
         override val timestampMs: Long
     ) : TriggerEvent
 }

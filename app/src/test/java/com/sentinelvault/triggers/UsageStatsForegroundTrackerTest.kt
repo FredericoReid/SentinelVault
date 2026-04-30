@@ -44,9 +44,9 @@ class UsageStatsForegroundTrackerTest {
     fun `returns the most recent foreground package`() {
         val tracker = trackerWith(
             listOf(
-                Sample(UsageEvents.Event.MOVE_TO_FOREGROUND, "com.first"),
-                Sample(UsageEvents.Event.MOVE_TO_BACKGROUND, "com.first"),
-                Sample(UsageEvents.Event.MOVE_TO_FOREGROUND, "com.second")
+                Sample(UsageEvents.Event.ACTIVITY_RESUMED, "com.first"),
+                Sample(UsageEvents.Event.ACTIVITY_PAUSED, "com.first"),
+                Sample(UsageEvents.Event.ACTIVITY_RESUMED, "com.second")
             )
         )
         assertThat(tracker.currentForegroundPackage(0L)).isEqualTo("com.second")

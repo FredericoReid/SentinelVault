@@ -20,8 +20,8 @@ fun interface LayoutParamsFactory {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else
                 @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_SYSTEM_ERROR
+            // FLAG_LAYOUT_INSET_DECOR is deprecated since API 30 and ignored from API 35.
             var flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_INSET_DECOR or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             if (armed) {
                 // Pre-arm path: do not steal touch/focus, keep the view alive but transparent.

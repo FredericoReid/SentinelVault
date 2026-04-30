@@ -56,5 +56,6 @@ enum class VerifyReason {
     SensitiveAppOpened,
     ContextBreach,
     SnatchDetected,
-    ForegroundAppChanged
+    ForegroundAppChanged,
+    DeviceUpright
 }

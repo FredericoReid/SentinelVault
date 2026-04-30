@@ -3,4 +3,66 @@
     <string name="app_name">SentinelVault</string>
     <string name="accessibility_service_label">SentinelVault Foreground Tracker</string>
     <string name="accessibility_service_description">Reads only the package name of the active window so SentinelVault can detect when a stranger opens a different app while the device is unlocked. No window content, text or input is collected.</string>
+
+    <!-- Epic 9 / Task 9.2: persistent foreground-service notification copy. -->
+    <string name="vigilance_channel_name">Vigilância contínua</string>
+    <string name="vigilance_channel_description">Notificação persistente exigida pelo Android para manter a vigilância em segundo plano. Sem som e sem vibração.</string>
+    <string name="vigilance_notification_title">SentinelVault ativo</string>
+    <string name="vigilance_notification_body_idle">Observando gatilhos</string>
+    <string name="vigilance_notification_body_verifying">Verificando…</string>
+    <string name="vigilance_notification_body_breach">Violação detectada — revise no Vault</string>
+
+    <!-- Epic 9 / Task 9.6: OEM battery-optimisation onboarding. -->
+    <string name="onboarding_battery_title">Bateria sem restrições</string>
+    <string name="onboarding_battery_body">Sentinel precisa rodar continuamente para vigiar o desbloqueio. Sem essa permissão, o Android pode encerrá-lo em segundos, especialmente em aparelhos Samsung, Xiaomi e Huawei.</string>
+    <string name="onboarding_battery_cta">Ignorar otimização de bateria</string>
+    <string name="onboarding_battery_manual_samsung">Configurações → Bateria e cuidados do dispositivo → Bateria → Limites de uso em segundo plano → Apps que não entram em suspensão → adicionar SentinelVault.</string>
+    <string name="onboarding_battery_manual_xiaomi">Configurações → Apps → Gerenciar apps → SentinelVault → Economia de bateria → Sem restrições. Ative também \"Iniciar automaticamente\".</string>
+    <string name="onboarding_battery_manual_huawei">Configurações → Bateria → Inicialização de apps → SentinelVault → Gerenciar manualmente → todas as opções ativadas.</string>
+    <string name="onboarding_battery_manual_oppo">Configurações → Bateria → Uso de bateria → SentinelVault → Permitir atividade em segundo plano + Iniciar em segundo plano.</string>
+    <string name="onboarding_battery_manual_generic">Configurações → Bateria → Otimização de bateria → SentinelVault → Não otimizar.</string>
+
+    <!-- Epic 9 / Task 9.2: Android 13+ POST_NOTIFICATIONS onboarding. -->
+    <string name="onboarding_notifications_title">Notificações</string>
+    <string name="onboarding_notifications_body">A vigilância contínua exige uma notificação persistente para sinalizar que está ativa. Sem essa permissão a câmera ainda funciona, mas você não vê o estado.</string>
+    <string name="onboarding_notifications_cta">Permitir notificações</string>
+
+    <!-- Epic 9 / Task 9.7: dashboard status card + settings switch. -->
+    <string name="vigilance_status_active">Vigilância ativa em segundo plano</string>
+    <string name="vigilance_status_degraded">Vigilância ativa, mas o sistema pode encerrá-la — toque para corrigir</string>
+    <string name="vigilance_status_inactive">Vigilância desligada — toque para ativar</string>
+    <string name="vigilance_settings_title">Vigilância contínua</string>
+    <string name="vigilance_settings_subtitle">Mantém o serviço de fundo que vigia desbloqueio, troca de app e sinais físicos do aparelho.</string>
+    <string name="vigilance_self_test_label">Auto-teste de vigilância</string>
+    <string name="vigilance_self_test_subtitle">Confirma que a câmera frontal e o motor de comparação estão funcionais. Não substitui a vigilância contínua.</string>
+    <string name="enrollment_title">Posicione o rosto em qualquer parte do quadro — o Sentinel detecta de qualquer ângulo.</string>
+
+    <string name="dashboard_eyebrow">SENTINEL / PAINEL VIVO</string>
+    <string name="dashboard_title">Vault</string>
+    <string name="dashboard_subtitle">Vigilância silenciosa, forense local e controles rápidos para o escudo de fundo.</string>
+    <string name="dashboard_settings_title">Configurações</string>
+    <string name="dashboard_settings_subtitle">Ajuste gatilhos, tolerância e comportamento do serviço contínuo.</string>
+    <string name="dashboard_timeline_title">Linha do tempo</string>
+    <string name="dashboard_timeline_subtitle">Incidentes, autocorreções e bloqueios confirmados aparecem aqui.</string>
+    <string name="dashboard_empty_title">Ainda sem incidentes</string>
+    <string name="dashboard_empty_body">Quando o Sentinel detectar movimentação suspeita, esta área vira seu painel forense.</string>
+    <string name="dashboard_error_title">Vault indisponível</string>
+
+    <string name="settings_back">← Voltar</string>
+    <string name="settings_back_to_dashboard">Voltar ao Vault</string>
+    <string name="settings_eyebrow">AJUSTES DE CAMPO</string>
+    <string name="settings_title">Controle fino</string>
+    <string name="settings_subtitle">Ajuste o comportamento da vigilância para o seu uso real: mesa, bolso, enquadramento imperfeito e resposta do sistema.</string>
+    <string name="settings_engine_section_title">Motor principal</string>
+    <string name="settings_engine_section_body">Liga ou desliga a vigilância contínua e o serviço em segundo plano.</string>
+    <string name="settings_trigger_section_title">Gatilhos físicos</string>
+    <string name="settings_trigger_section_body">Sensores que fazem o Sentinel reagir quando o aparelho muda de contexto sem aviso.</string>
+    <string name="settings_desk_lift_title">Verificar ao erguer da mesa</string>
+    <string name="settings_desk_lift_body">Quando o aparelho estiver desbloqueado, parado sobre a mesa com a tela para cima ou para baixo, um levantamento repentino entra direto no modo de verificação facial.</string>
+    <string name="settings_recognition_section_title">Reconhecimento</string>
+    <string name="settings_recognition_section_body">Controles para reduzir falso intruso quando a câmera pega um enquadramento ruim.</string>
+    <string name="settings_lenient_title">Tolerância de enquadramento</string>
+    <string name="settings_lenient_body">Evita punir cedo demais quando seu rosto aparece parcial, deslocado ou só entra na câmera depois do primeiro frame.</string>
+    <string name="settings_diagnostics_title">Leitura operacional</string>
+    <string name="settings_diagnostics_body">O Sentinel continua local e silencioso: gatilhos físicos levantam o estado de alerta, e quadros marginais viram nova tentativa em vez de intruso imediato.</string>
 </resources>

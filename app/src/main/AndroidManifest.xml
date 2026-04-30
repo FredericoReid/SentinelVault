@@ -33,6 +33,9 @@
         tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.HIGH_SAMPLING_RATE_SENSORS" />
+    <!-- Epic 9 / Task 9.2: Android 13+ runtime permission for the persistent FGS notification.
+         The service still works without it, but the user has no visibility into its state. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:name=".SentinelApp"
@@ -51,6 +54,8 @@
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
+            android:screenOrientation="portrait"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:theme="@style/Theme.SentinelVault">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -97,5 +102,27 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/accessibility_service_config" />
         </service>
+
+        <!-- Epic 9 / Task 9.1: foreground LifecycleService that owns the headless camera
+             session and the SentinelRuntime. `stopWithTask=false` is critical so Samsung's
+             Recents-swipe call to onTaskRemoved does NOT end the service alongside the task. -->
+        <service
+            android:name=".service.SentinelVigilanceService"
+            android:exported="false"
+            android:foregroundServiceType="camera"
+            android:stopWithTask="false" />
+
+        <!-- Epic 9 / Task 9.5: re-arms the vigilance service on reboot. `exported=true` is
+             required because the Android system process is the broadcast sender; this is one
+             of the documented exceptions to the Android 12 receiver-export rule. -->
+        <receiver
+            android:name=".service.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

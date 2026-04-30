@@ -1,6 +1,9 @@
 package com.sentinelvault
 
 import com.sentinelvault.lockdown.LockdownCoordinator
+import com.sentinelvault.triggers.DeskLiftTriggerDetector
+import com.sentinelvault.triggers.MotionTriggerDetector
+import com.sentinelvault.triggers.UprightTriggerDetector
 import com.sentinelvault.vigilance.VigilanceStateMachine
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -24,7 +27,10 @@ import kotlinx.coroutines.launch
 @Singleton
 class SentinelRuntime @Inject constructor(
     private val machine: VigilanceStateMachine,
-    private val coordinator: LockdownCoordinator
+    private val coordinator: LockdownCoordinator,
+    private val deskLiftDetector: DeskLiftTriggerDetector,
+    private val motionDetector: MotionTriggerDetector,
+    private val uprightDetector: UprightTriggerDetector
 ) {
 
     private val supervisor: Job = SupervisorJob()
@@ -38,11 +44,19 @@ class SentinelRuntime @Inject constructor(
         started = true
         scope.launch { machine.run(this) }
         scope.launch { coordinator.observe() }
+        // Sensor-driven trigger sources. Both implementations are themselves idempotent
+        // and gracefully degrade (return false) when the underlying sensor is missing.
+        deskLiftDetector.start()
+        motionDetector.start()
+        uprightDetector.start()
     }
 
     /** Tears down both collectors. Primarily useful in instrumentation tests. */
     fun stop() {
         if (!started) return
+        deskLiftDetector.stop()
+        motionDetector.stop()
+        uprightDetector.stop()
         scope.cancel()
         started = false
     }

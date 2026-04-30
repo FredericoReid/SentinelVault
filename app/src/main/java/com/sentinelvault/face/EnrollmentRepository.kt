@@ -5,6 +5,7 @@ import com.sentinelvault.data.db.dao.EmbeddingDao
 import com.sentinelvault.data.db.entity.EmbeddingEntity
 import com.sentinelvault.security.MemorySanitizer
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +21,7 @@ import kotlinx.coroutines.withContext
  */
 @Singleton
 class EnrollmentRepository @Inject constructor(
+    @param:Named("enrollmentFaceDetector")
     private val faceDetector: FaceDetector,
     private val faceEmbedder: FaceEmbedder,
     private val embeddingDao: EmbeddingDao,

@@ -46,19 +46,34 @@ class FrameAnalyzer(
 }
 
 internal fun ImageProxy.toRotatedArgbBitmap(): Bitmap {
-    val nv21 = yuv420ToNv21(this)
-    val yuv = YuvImage(nv21, ImageFormat.NV21, width, height, null)
-    val out = ByteArrayOutputStream()
-    yuv.compressToJpeg(Rect(0, 0, width, height), JPEG_QUALITY, out)
-    val bytes = out.toByteArray()
-    val raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        ?: error("Unable to decode YUV frame")
+    val raw = if (format == ImageFormat.JPEG || planes.size == 1) {
+        decodeJpegPlane(this)
+    } else {
+        decodeYuvPlane(this)
+    }
     val rotation = imageInfo.rotationDegrees
     if (rotation == 0) return raw
     val matrix = Matrix().apply { postRotate(rotation.toFloat()) }
     val rotated = Bitmap.createBitmap(raw, 0, 0, raw.width, raw.height, matrix, true)
     if (rotated !== raw) raw.recycle()
     return rotated
+}
+
+private fun decodeJpegPlane(image: ImageProxy): Bitmap {
+    val buffer = image.planes[0].buffer
+    val bytes = ByteArray(buffer.remaining()).also { buffer.get(it) }
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        ?: error("Unable to decode JPEG frame")
+}
+
+private fun decodeYuvPlane(image: ImageProxy): Bitmap {
+    val nv21 = yuv420ToNv21(image)
+    val yuv = YuvImage(nv21, ImageFormat.NV21, image.width, image.height, null)
+    val out = ByteArrayOutputStream()
+    yuv.compressToJpeg(Rect(0, 0, image.width, image.height), JPEG_QUALITY, out)
+    val bytes = out.toByteArray()
+    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+        ?: error("Unable to decode YUV frame")
 }
 
 private const val JPEG_QUALITY = 90

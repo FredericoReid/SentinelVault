@@ -21,14 +21,16 @@ fun SecurityButton(
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(56.dp),
-        shape = RoundedCornerShape(8.dp),
+        modifier = modifier.height(58.dp),
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 10.dp, bottomEnd = 22.dp, bottomStart = 10.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary
+            contentColor = MaterialTheme.colorScheme.onPrimary,
+            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
+            disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant
         ),
         contentPadding = PaddingValues(horizontal = 24.dp)
     ) {
-        Text(text = text, style = MaterialTheme.typography.bodyMedium)
+        Text(text = text, style = MaterialTheme.typography.labelLarge)
     }
 }

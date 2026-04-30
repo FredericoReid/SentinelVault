@@ -4,6 +4,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.hardware.SensorManager
 import com.sentinelvault.triggers.SensitiveAppRegistry
+import com.sentinelvault.triggers.DeskLiftHeuristic
 import com.sentinelvault.triggers.SnatchHeuristic
 import com.sentinelvault.triggers.TriggerClock
 import com.sentinelvault.triggers.UsageStatsForegroundTracker
@@ -50,4 +51,8 @@ object TriggerModule {
     @Provides
     @Singleton
     fun provideSnatchHeuristic(): SnatchHeuristic = SnatchHeuristic()
+
+    @Provides
+    @Singleton
+    fun provideDeskLiftHeuristic(): DeskLiftHeuristic = DeskLiftHeuristic()
 }

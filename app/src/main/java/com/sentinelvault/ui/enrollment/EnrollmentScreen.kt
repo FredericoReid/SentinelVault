@@ -30,11 +30,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.sentinelvault.R
 import com.sentinelvault.face.toRotatedArgbBitmap
 import com.sentinelvault.ui.components.ArMaskOverlay
 import com.sentinelvault.ui.components.CameraPreviewView
@@ -77,7 +79,7 @@ fun EnrollmentScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "Frame your face inside the oval",
+                text = enrollmentHeadline(state),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onBackground,
                 modifier = Modifier.fillMaxWidth(),
@@ -87,13 +89,21 @@ fun EnrollmentScreen(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                if (hasCameraPermission.value) CameraStage(viewModel = viewModel, context = context)
+                if (hasCameraPermission.value) CameraStage(state = state, viewModel = viewModel, context = context)
                 else PermissionPlaceholder()
             }
             StatusLine(state = state)
             Spacer(Modifier.height(8.dp))
         }
     }
+}
+
+@Composable
+private fun enrollmentHeadline(state: EnrollmentUiState): String = when {
+    state.status == EnrollmentStatus.Capturing -> "Saving your face\u2026"
+    state.status == EnrollmentStatus.Saved -> "Face saved"
+    state.hasFace -> "Looks good \u2014 tap Save Face to enroll"
+    else -> stringResource(R.string.enrollment_title)
 }
 
 @Composable
@@ -122,26 +132,33 @@ private fun PermissionPlaceholder() {
 }
 
 @Composable
-private fun CameraStage(viewModel: EnrollmentViewModel, context: Context) {
+private fun CameraStage(state: EnrollmentUiState, viewModel: EnrollmentViewModel, context: Context) {
     val analyzer = remember(viewModel) { viewModel.buildAnalyzer() }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var captureError by remember { mutableStateOf<String?>(null) }
+    val onCaptureReady = remember { { capture: ImageCapture -> imageCapture = capture } }
+    val onCameraError = remember { { t: Throwable -> captureError = t.message } }
+    val canCapture = imageCapture != null &&
+        state.hasFace &&
+        state.status != EnrollmentStatus.Capturing &&
+        state.status != EnrollmentStatus.Saved
 
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
             CameraPreviewView(
                 modifier = Modifier.fillMaxSize(),
                 analyzer = analyzer,
-                onCaptureReady = { imageCapture = it },
-                onError = { captureError = it.message }
+                onCaptureReady = onCaptureReady,
+                onError = onCameraError
             )
             ArMaskOverlay(quality = viewModel.quality, modifier = Modifier.fillMaxSize())
         }
         Spacer(Modifier.height(16.dp))
         SecurityButton(
-            text = "Capture",
-            enabled = imageCapture != null,
+            text = if (state.status == EnrollmentStatus.Capturing) "Saving\u2026" else "Save Face",
+            enabled = canCapture,
             onClick = {
+                captureError = null
                 imageCapture?.takePicture(
                     ContextCompat.getMainExecutor(context),
                     captureCallback(viewModel) { captureError = it }
@@ -172,8 +189,8 @@ private fun captureCallback(
 
 @Composable
 private fun StatusLine(state: EnrollmentUiState) {
-    val (label, color) = when (state.status) {
-        EnrollmentStatus.Idle -> "Ready" to MaterialTheme.colorScheme.onBackground
+    val labelAndColor: Pair<String, Color>? = when (state.status) {
+        EnrollmentStatus.Idle -> null
         EnrollmentStatus.Capturing -> "Processing\u2026" to MaterialTheme.colorScheme.primary
         EnrollmentStatus.Saved -> "Enrollment saved" to Color(0xFF00E676)
         EnrollmentStatus.NoFace -> "No face detected, try again" to AlertNeon
@@ -181,8 +198,8 @@ private fun StatusLine(state: EnrollmentUiState) {
         EnrollmentStatus.Error -> (state.errorMessage ?: "Unknown error") to AlertNeon
     }
     Text(
-        text = label,
-        color = color,
+        text = labelAndColor?.first.orEmpty(),
+        color = labelAndColor?.second ?: Color.Transparent,
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.fillMaxWidth().testTag(ENROLLMENT_STATUS_TAG),
         textAlign = TextAlign.Center

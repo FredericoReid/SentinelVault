@@ -14,6 +14,8 @@ class RoutesTest {
         assertThat(Routes.DASHBOARD).isEqualTo("route_dashboard")
         assertThat(Routes.INCIDENT_DETAIL_PATTERN).isEqualTo("route_incident_detail/{incidentId}")
         assertThat(Routes.INCIDENT_ID_ARG).isEqualTo("incidentId")
+        assertThat(Routes.INTRUDER_TEST).isEqualTo("route_intruder_test")
+        assertThat(Routes.VIGILANCE_SETTINGS).isEqualTo("route_vigilance_settings")
     }
 
     @Test

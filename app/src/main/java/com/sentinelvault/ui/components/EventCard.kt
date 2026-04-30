@@ -1,6 +1,7 @@
 package com.sentinelvault.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -52,8 +53,9 @@ fun EventCard(
         modifier = modifier
             .fillMaxWidth()
             .testTag(eventCardTag(eventId)),
-        shape = RoundedCornerShape(12.dp),
-        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 22.dp, topEnd = 10.dp, bottomEnd = 22.dp, bottomStart = 10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(
@@ -65,21 +67,21 @@ fun EventCard(
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = typeLabel,
-                    style = MaterialTheme.typography.headlineLarge,
+                    style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(Modifier.size(4.dp))
                 Text(
                     text = timestampLabel,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (!foregroundPackage.isNullOrBlank()) {
                     Spacer(Modifier.size(2.dp))
                     Text(
                         text = foregroundPackage,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
                 if (!notes.isNullOrBlank()) {
@@ -87,7 +89,7 @@ fun EventCard(
                     Text(
                         text = notes,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }

@@ -4,13 +4,13 @@ import android.graphics.Bitmap
 import com.sentinelvault.data.db.entity.EmbeddingEntity
 
 /**
- * Produces an L2-normalised facial embedding (the 128-d vector consumed by Cosine Similarity
+ * Produces an L2-normalised facial embedding (the 192-d vector consumed by Cosine Similarity
  * in Epic 5). Implementations MUST run their TFLite inference off the main thread - see the
  * Memory Hygiene clause of guide.md §3.
  */
 interface FaceEmbedder {
 
-    /** Output vector length. MobileFaceNet ships 128 floats per inference. */
+    /** Output vector length. MobileFaceNet ships 192 floats per inference. */
     val outputSize: Int get() = EmbeddingEntity.VECTOR_SIZE
 
     /**

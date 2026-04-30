@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
 import com.sentinelvault.security.admin.SentinelDeviceAdminReceiver
@@ -30,7 +31,12 @@ object PermissionsCoordinator {
 
     fun isUsageStatsGranted(context: Context): Boolean {
         val ops = context.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
+        // The (op, uid, packageName) overload is deprecated in API 36; the recommended
+        // AttributionSource path is only available on `noteOp*` family methods, not on
+        // `unsafeCheckOpNoThrow`. Until the platform exposes a non-deprecated `checkOp`
+        // for arbitrary (uid, package) tuples we keep the SDK-gated fallback below.
         val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            @Suppress("DEPRECATION")
             ops.unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_GET_USAGE_STATS,
                 Process.myUid(),
@@ -78,4 +84,31 @@ object PermissionsCoordinator {
 
     fun requiresRestrictedSettingsBypass(): Boolean =
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+    /**
+     * Epic 9 / Task 9.6: battery-optimisation exemption is what allows the foreground service
+     * to survive Doze on Samsung/Xiaomi/Huawei. The platform check itself works on every
+     * supported API (the [PowerManager] is available since Android 6).
+     */
+    fun isBatteryOptimisationIgnored(context: Context): Boolean {
+        val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        return pm.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * Returns the system intent that asks the user to whitelist the app from Doze. Marked as
+     * `@SuppressLint("BatteryLife")` at the call site is unnecessary because we own the app
+     * binary and the Play-Store review of the permission does not apply to sideloaded builds.
+     */
+    fun batteryOptimisationIntent(context: Context): Intent = Intent(
+        Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+        Uri.parse("package:${context.packageName}")
+    )
+
+    /** Epic 9 / Task 9.2: Android 13+ runtime check for the persistent notification. */
+    fun isPostNotificationsGranted(context: Context): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return true
+        return context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+    }
 }

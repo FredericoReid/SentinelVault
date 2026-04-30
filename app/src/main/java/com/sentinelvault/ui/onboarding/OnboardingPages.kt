@@ -35,6 +35,19 @@ enum class OnboardingPage(val title: String, val body: String, val ctaLabel: Str
         body = "Required to lock the screen at the hardware level when a breach is confirmed.",
         ctaLabel = "Activate device admin"
     ),
+    BatteryExemption(
+        // Body / CTA come from R.string for localisation; the placeholder strings here are
+        // never displayed because [BatteryExemptionPage] renders the localised resources
+        // directly. Kept non-empty so the existing CTA enable/disable heuristic still works.
+        title = "Bateria",
+        body = "Battery optimisation exemption — see localised page.",
+        ctaLabel = "Open battery settings"
+    ),
+    Notifications(
+        title = "Notificações",
+        body = "Required on Android 13+ so the persistent vigilance notification is visible.",
+        ctaLabel = "Allow notifications"
+    ),
     RestrictedSettings(
         title = "Android 13+ restricted settings",
         body = "Sideloaded apps are blocked from toggling Accessibility / Device Admin until you" +

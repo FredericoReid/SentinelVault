@@ -5,7 +5,7 @@
 
 [![Android CI](../../actions/workflows/android.yml/badge.svg)](../../actions/workflows/android.yml)
 ![Min SDK](https://img.shields.io/badge/minSdk-26-3DDC84?logo=android&logoColor=white)
-![Target SDK](https://img.shields.io/badge/targetSdk-34-3DDC84?logo=android&logoColor=white)
+![Target SDK](https://img.shields.io/badge/targetSdk-36-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF?logo=kotlin&logoColor=white)
 ![License](https://img.shields.io/badge/license-TBD-lightgrey)
 ![Network](https://img.shields.io/badge/network-zero-critical)
@@ -72,11 +72,11 @@ deliberately does not have.
 |---|---|
 | **Zero-Internet Policy** | The app does not declare `android.permission.INTERNET`. No Retrofit / Ktor / Firebase. Ever. |
 | **Edge AI** | Face detection (BlazeFace) and embedding (MobileFaceNet INT8) run via TFLite + NNAPI on-device. |
-| **Zero-Knowledge Enrollment** | Captured frames are reduced to a 128-d `FloatArray`; the source bitmaps are zeroed and recycled by `MemorySanitizer` before returning from the inference scope. |
+| **Zero-Knowledge Enrollment** | Captured frames are reduced to a 192-d `FloatArray`; the source bitmaps are zeroed and recycled by `MemorySanitizer` before returning from the inference scope. |
 | **Encrypted at Rest** | Room + SQLCipher. The DB key is wrapped by an Android Keystore key (AES-256/GCM, hardware-backed when available). |
 | **Hashed Root of Trust** | The Admin PIN is stretched with PBKDF2-HmacSHA256 (210k iterations) before storage. |
 | **Runtime Integrity** | `IntegrityManager` pins the SHA-256 of the production signing certificate via `local.properties` and refuses to run if the APK was re-signed. |
-| **Event-Driven Vigilance** | The camera is **off** during normal use. `TriggerOrchestrator` fans in unlock / app-switch / motion signals; only triggers consume a frame. |
+| **Event-Driven Vigilance** | The camera is **off** during normal use. `TriggerOrchestrator` fans in unlock / app-switch / motion signals, including desk pickup from face-up or face-down poses; only triggers consume a frame, and marginal facial frames are retried instead of punished early. |
 | **Bounded Trust** | A successful owner-match mints a `ContextToken` scoped to the active app, valid for 5 min; switching apps or opening a sensitive package re-arms verification immediately. |
 
 ---
@@ -91,7 +91,7 @@ deliberately does not have.
 - **ML:** LiteRT 1.4 (`com.google.ai.edge.litert`, successor of TensorFlow Lite, NNAPI delegate) — BlazeFace + MobileFaceNet INT8.
 - **System integrations:** `DevicePolicyManager`, `AccessibilityService`, `UsageStatsManager`, `SensorManager`.
 - **Testing:** JUnit 4, Truth, MockK, Coroutines `kotlinx-coroutines-test` (`UnconfinedTestDispatcher`), Compose UI tests, Hilt test runner.
-- **Min SDK:** 26 — **Target / Compile SDK:** 34 — **JVM toolchain:** Java 17.
+- **Min SDK:** 26 — **Target / Compile SDK:** 36 — **JVM toolchain:** Java 17.
 
 ---
 
@@ -99,7 +99,7 @@ deliberately does not have.
 
 ### Prerequisites
 - JDK 17 (Temurin recommended).
-- Android SDK with platforms 34 + build-tools 34.
+- Android SDK with platforms 36 + build-tools 36.
 - A device or emulator on API 26+.
 
 ### First-time setup
@@ -146,7 +146,7 @@ that timelines (pulse intervals, token expiry, alert windows) are deterministic.
 ./gradlew :app:connectedDebugAndroidTest  # Compose + Hilt instrumented tests (device required)
 ```
 
-Coverage highlights as of Epic 5:
+Coverage highlights after Epics 1-9 and the initial Epic 10 omni-angle tranche:
 
 | Module | Test class | Cases |
 |---|---|---|
@@ -170,17 +170,18 @@ app/
     di/            # Hilt modules: Auth, Database, Face, Security, Trigger, Vigilance.
     face/          # FaceDetector / FaceEmbedder TFLite wrappers, EnrollmentRepository, FrameAnalyzer.
     security/      # KeystoreManager, PinHasher, IntegrityManager, MemorySanitizer, admin/.
-    triggers/      # TriggerOrchestrator, SnatchHeuristic, ContextTokenManager, foreground trackers,
-                   #   AccessibilityService, UserPresentReceiver, SensitiveAppRegistry.
+    triggers/      # TriggerOrchestrator, SnatchHeuristic, DeskLiftHeuristic, upright / desk-lift
+                   #   detectors, ContextTokenManager, foreground trackers, AccessibilityService.
     vigilance/     # VigilanceStateMachine, PulseScheduler, FrameVerifier, CosineSimilarity,
                    #   LivenessProbe, OwnerTemplateProvider, VerificationEngine + frame source.
     ui/
       components/  # Reusable composables (PinPadView, ArMaskOverlay, ...).
-      dashboard/   # Vault dashboard (Epic 7 — scaffold).
+      dashboard/   # Vault dashboard + tactical status/actions surface.
       enrollment/  # Guided face capture screen + ViewModel.
       gatekeeper/  # PIN entry / creation screen + ViewModel.
       incident/    # Incident detail screen (Epic 7 — scaffold).
       onboarding/  # Permission carousel.
+      settings/    # Sectioned vigilance settings: service, physical triggers, framing tolerance.
       navigation/  # NavHost + Routes.
       theme/       # SentinelTheme tokens.
   src/test/        # JVM unit tests (mirrors main package layout).
@@ -192,7 +193,7 @@ guide.md           # Master spec — single source of truth for the AI pipeline.
 
 ## 8. Roadmap Status
 
-The development pipeline is organised as 7 epics in [`guide.md`](./guide.md).
+The development pipeline is organised in epics in [`guide.md`](./guide.md).
 Per-task status is tracked there; this section is the high-altitude summary.
 
 - ✅ **Epic 1** — Core Setup, Integrity & Security Foundation.
@@ -200,8 +201,11 @@ Per-task status is tracked there; this section is the high-altitude summary.
 - ✅ **Epic 3** — Zero-Knowledge Biometric Enrollment.
 - ✅ **Epic 4** — Event-Driven Triggers & Context Token.
 - ✅ **Epic 5** — The 3-Minute State Machine Protocol.
-- ⬜ **Epic 6** — Action, Punishment & Lockdown (`DevicePolicyManager`, soft-lock overlay).
-- ⬜ **Epic 7** — Vault Dashboard & Storage Management (FIFO ring buffer, `EventCard` UI).
+- ✅ **Epic 6** — Action, Punishment & Lockdown (`DevicePolicyManager`, soft-lock overlay).
+- ✅ **Epic 7** — Vault Dashboard & Storage Management (FIFO ring buffer, `EventCard` UI).
+- ✅ **Epic 8** — Deprecation Cleanup & AGP 10 Readiness.
+- ✅ **Epic 9** — Background Vigilance & Persistence.
+- 🚧 **Epic 10** — Omni-Angle Vigilance, Background Resilience & Sentinel UI Renaissance (desk-lift trigger + settings/control surface tranche in progress).
 
 ---
 

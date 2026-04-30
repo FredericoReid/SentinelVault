@@ -8,7 +8,7 @@ import kotlin.math.sqrt
  * guide.md §1.4 — "computes the cosine similarity to the owner template").
  *
  * The function is dimension-agnostic but enforces equal length to surface integration bugs
- * early; in production both inputs are 128-d and L2-normalised so the dot product is already
+ * early; in production both inputs are 192-d and L2-normalised so the dot product is already
  * the cosine. The explicit normalisation step below is therefore cheap and keeps the helper
  * usable for ad-hoc, non-normalised comparisons (e.g. unit tests, livelihood probes).
  */

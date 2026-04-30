@@ -5,7 +5,9 @@ import com.sentinelvault.face.FaceDetector
 import com.sentinelvault.face.FaceEmbedder
 import com.sentinelvault.face.FaceEmbedderUnavailableException
 import com.sentinelvault.security.MemorySanitizer
+import com.sentinelvault.service.VigilanceSettings
 import javax.inject.Inject
+import javax.inject.Named
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -27,11 +29,13 @@ import kotlinx.coroutines.withContext
  */
 @Singleton
 class FrameVerifier @Inject constructor(
+    @param:Named("vigilanceFaceDetector")
     private val faceDetector: FaceDetector,
     private val faceEmbedder: FaceEmbedder,
     private val livenessProbe: LivenessProbe,
     private val ownerTemplateProvider: OwnerTemplateProvider,
     private val sanitizer: MemorySanitizer,
+    private val settings: VigilanceSettings,
     private val config: VigilanceConfig,
     private val clock: VerifierClock = VerifierClock.SYSTEM,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default
@@ -46,7 +50,10 @@ class FrameVerifier @Inject constructor(
         val now: Long
         try {
             now = clock.nowMs()
-            faceDetector.detect(bitmap) ?: return@withContext VerificationOutcome.NoFace(now)
+            val face = faceDetector.detect(bitmap) ?: return@withContext VerificationOutcome.NoFace(now)
+            if (settings.isLenientFramingEnabled() && face.score < MIN_FACE_SCORE_FOR_EMBEDDING) {
+                return@withContext VerificationOutcome.NoFace(now)
+            }
             val liveness = livenessProbe.evaluate(bitmap)
             if (liveness is LivenessProbe.Result.Flat) {
                 return@withContext VerificationOutcome.NotLive(liveness.variance, now)
@@ -68,8 +75,11 @@ class FrameVerifier @Inject constructor(
                     )
                 }
                 val similarity = CosineSimilarity.between(fresh, owner)
-                if (similarity >= config.matchThreshold) VerificationOutcome.Match(similarity, now)
-                else VerificationOutcome.Mismatch(similarity, now)
+                when {
+                    similarity >= config.matchThreshold -> VerificationOutcome.Match(similarity, now)
+                    shouldTreatAsRetry(face.score, similarity) -> VerificationOutcome.NoFace(now)
+                    else -> VerificationOutcome.Mismatch(similarity, now)
+                }
             } finally {
                 sanitizer.zero(fresh)
                 sanitizer.zero(owner)
@@ -79,5 +89,17 @@ class FrameVerifier @Inject constructor(
         } finally {
             sanitizer.recycle(bitmap)
         }
+    }
+
+    private fun shouldTreatAsRetry(faceScore: Float, similarity: Float): Boolean {
+        if (!settings.isLenientFramingEnabled()) return false
+        if (similarity < config.matchThreshold - NEAR_MATCH_MARGIN) return false
+        return faceScore < STRONG_FACE_SCORE
+    }
+
+    private companion object {
+        private const val MIN_FACE_SCORE_FOR_EMBEDDING: Float = 0.87f
+        private const val STRONG_FACE_SCORE: Float = 0.93f
+        private const val NEAR_MATCH_MARGIN: Float = 0.10f
     }
 }

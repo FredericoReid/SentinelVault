@@ -12,7 +12,9 @@ import com.sentinelvault.ui.dashboard.DashboardScreen
 import com.sentinelvault.ui.enrollment.EnrollmentScreen
 import com.sentinelvault.ui.gatekeeper.GatekeeperScreen
 import com.sentinelvault.ui.incident.IncidentDetailScreen
+import com.sentinelvault.ui.intrudertest.IntruderTestScreen
 import com.sentinelvault.ui.onboarding.OnboardingScreen
+import com.sentinelvault.ui.settings.VigilanceSettingsScreen
 
 @Composable
 fun SentinelNavHost(
@@ -61,7 +63,9 @@ fun SentinelNavHost(
             DashboardScreen(
                 onIncidentClick = { incidentId ->
                     navController.navigate(Routes.incidentDetail(incidentId))
-                }
+                },
+                onLaunchIntruderTest = { navController.navigate(Routes.INTRUDER_TEST) },
+                onOpenVigilanceSettings = { navController.navigate(Routes.VIGILANCE_SETTINGS) }
             )
         }
         composable(
@@ -70,6 +74,12 @@ fun SentinelNavHost(
         ) { entry ->
             val id = entry.arguments?.getLong(Routes.INCIDENT_ID_ARG) ?: 0L
             IncidentDetailScreen(incidentId = id)
+        }
+        composable(Routes.INTRUDER_TEST) {
+            IntruderTestScreen(onBack = { navController.popBackStack() })
+        }
+        composable(Routes.VIGILANCE_SETTINGS) {
+            VigilanceSettingsScreen(onBack = { navController.popBackStack() })
         }
     }
 }
