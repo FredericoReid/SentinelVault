@@ -9,13 +9,22 @@ import javax.inject.Singleton
  * narrow interface so the verification engine — and its unit tests — never touch SQLCipher
  * directly. The provider returns `null` when enrollment hasn't happened yet.
  */
-fun interface OwnerTemplateProvider {
+interface OwnerTemplateProvider {
     suspend fun load(): FloatArray?
+    suspend fun update(newTemplate: FloatArray)
 }
 
 @Singleton
 class DaoOwnerTemplateProvider @Inject constructor(
-    private val embeddingDao: EmbeddingDao
+    private val embeddingDao: EmbeddingDao,
+    private val clock: com.sentinelvault.triggers.TriggerClock
 ) : OwnerTemplateProvider {
     override suspend fun load(): FloatArray? = embeddingDao.getOwnerVector()
+    override suspend fun update(newTemplate: FloatArray) {
+        val normalized = com.sentinelvault.vigilance.CosineSimilarity.normalize(newTemplate)
+        embeddingDao.upsert(com.sentinelvault.data.db.entity.EmbeddingEntity(
+            vector = normalized,
+            createdAtMs = clock.nowMs()
+        ))
+    }
 }

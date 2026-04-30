@@ -34,6 +34,7 @@ class FrameVerifier @Inject constructor(
     private val faceEmbedder: FaceEmbedder,
     private val livenessProbe: LivenessProbe,
     private val ownerTemplateProvider: OwnerTemplateProvider,
+    private val selfHealing: com.sentinelvault.lockdown.SelfHealingController,
     private val sanitizer: MemorySanitizer,
     private val settings: VigilanceSettings,
     private val config: VigilanceConfig,
@@ -75,8 +76,19 @@ class FrameVerifier @Inject constructor(
                     )
                 }
                 val similarity = CosineSimilarity.between(fresh, owner)
+                val threshold = selfHealing.currentMatchThreshold()
                 when {
-                    similarity >= config.matchThreshold -> VerificationOutcome.Match(similarity, now)
+                    similarity >= threshold -> {
+                        if (similarity >= 0.85f && similarity < 1.0f) {
+                            // Learning: blend the new high-confidence frame into the template
+                            val updated = FloatArray(owner.size)
+                            for (i in owner.indices) {
+                                updated[i] = owner[i] * 0.9f + fresh[i] * 0.1f
+                            }
+                            ownerTemplateProvider.update(updated)
+                        }
+                        VerificationOutcome.Match(similarity, now)
+                    }
                     shouldTreatAsRetry(face.score, similarity) -> VerificationOutcome.NoFace(now)
                     else -> VerificationOutcome.Mismatch(similarity, now)
                 }

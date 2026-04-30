@@ -10,6 +10,7 @@ import com.sentinelvault.face.FaceEmbedderUnavailableException
 import com.sentinelvault.security.MemorySanitizer
 import com.sentinelvault.service.VigilanceSettings
 import io.mockk.Runs
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -36,6 +37,11 @@ class FrameVerifierTest {
         every { recycle() } just Runs
     }
 
+    private fun ownerProvider(arr: FloatArray?) = mockk<OwnerTemplateProvider> {
+        coEvery { load() } returns arr
+        coEvery { update(any()) } just Runs
+    }
+
     private fun newVerifier(
         detector: FaceDetector,
         embedder: FaceEmbedder,
@@ -48,6 +54,9 @@ class FrameVerifierTest {
         embedder,
         liveness,
         owner,
+        mockk<com.sentinelvault.lockdown.SelfHealingController>(relaxed = true) {
+            every { currentMatchThreshold() } returns config.matchThreshold
+        },
         sanitizer,
         localSettings,
         config,
@@ -70,7 +79,7 @@ class FrameVerifierTest {
             detectorOk(),
             mockk { every { embed(any()) } returns fresh },
             liveOk(),
-            { owner }
+            ownerProvider(owner)
         )
         val result = verifier.verify(bitmap())
         assertThat(result).isInstanceOf(VerificationOutcome.Match::class.java)
@@ -85,7 +94,7 @@ class FrameVerifierTest {
             detectorOk(),
             mockk { every { embed(any()) } returns intruder },
             liveOk(),
-            { owner },
+            ownerProvider(owner),
             localSettings = mockk(relaxed = true) { every { isLenientFramingEnabled() } returns false }
         )
         val result = verifier.verify(bitmap())
@@ -102,7 +111,7 @@ class FrameVerifierTest {
             },
             embedder = mockk { every { embed(any()) } returns nearOwner },
             liveness = liveOk(),
-            owner = { owner }
+            owner = ownerProvider(owner)
         )
 
         val result = verifier.verify(bitmap())
@@ -119,7 +128,7 @@ class FrameVerifierTest {
             },
             embedder = embedder,
             liveness = liveOk(),
-            owner = { floatArrayOf(1f, 0f) }
+            owner = ownerProvider(floatArrayOf(1f, 0f))
         )
 
         val result = verifier.verify(bitmap())
@@ -135,7 +144,7 @@ class FrameVerifierTest {
             detectorOk(),
             embedder,
             mockk { every { evaluate(any()) } returns LivenessProbe.Result.Flat(2f) },
-            { floatArrayOf(1f, 0f) }
+            ownerProvider(floatArrayOf(1f, 0f))
         )
         val result = verifier.verify(bitmap())
         assertThat(result).isInstanceOf(VerificationOutcome.NotLive::class.java)
@@ -148,14 +157,14 @@ class FrameVerifierTest {
             mockk { every { detect(any()) } returns null },
             mockk(relaxed = true),
             mockk(relaxed = true),
-            { floatArrayOf(1f, 0f) }
+            ownerProvider(floatArrayOf(1f, 0f))
         )
         assertThat(verifier.verify(bitmap())).isInstanceOf(VerificationOutcome.NoFace::class.java)
     }
 
     @Test
     fun `missing owner template surfaces OwnerNotEnrolled`() = runTest(dispatcher) {
-        val verifier = newVerifier(detectorOk(), mockk(relaxed = true), liveOk(), { null })
+        val verifier = newVerifier(detectorOk(), mockk(relaxed = true), liveOk(), ownerProvider(null))
         assertThat(verifier.verify(bitmap()))
             .isInstanceOf(VerificationOutcome.OwnerNotEnrolled::class.java)
     }
@@ -166,7 +175,7 @@ class FrameVerifierTest {
             detectorOk(),
             mockk { every { embed(any()) } throws FaceEmbedderUnavailableException("no model") },
             liveOk(),
-            { floatArrayOf(1f, 0f) }
+            ownerProvider(floatArrayOf(1f, 0f))
         )
         val result = verifier.verify(bitmap())
         assertThat(result).isInstanceOf(VerificationOutcome.EmbedderUnavailable::class.java)
@@ -180,7 +189,7 @@ class FrameVerifierTest {
             detectorOk(),
             mockk { every { embed(any()) } returns floatArrayOf(0.9f, 0.1f) },
             liveOk(),
-            { floatArrayOf(1f, 0f) },
+            ownerProvider(floatArrayOf(1f, 0f)),
             sanitizer
         )
         verifier.verify(bm)
@@ -194,7 +203,7 @@ class FrameVerifierTest {
             detectorOk(),
             mockk { every { embed(any()) } returns FloatArray(3) },
             liveOk(),
-            { floatArrayOf(1f, 0f) }
+            ownerProvider(floatArrayOf(1f, 0f))
         )
         assertThat(verifier.verify(bitmap())).isInstanceOf(VerificationOutcome.Failure::class.java)
     }

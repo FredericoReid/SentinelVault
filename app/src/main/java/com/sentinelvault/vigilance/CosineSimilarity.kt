@@ -42,4 +42,13 @@ object CosineSimilarity {
             else -> raw
         }
     }
+    fun normalize(v: FloatArray): FloatArray {
+        var mag = 0f
+        for (f in v) mag += f * f
+        val denom = sqrt(mag)
+        if (denom == 0f) return v.copyOf()
+        val result = FloatArray(v.size)
+        for (i in v.indices) result[i] = v[i] / denom
+        return result
+    }
 }

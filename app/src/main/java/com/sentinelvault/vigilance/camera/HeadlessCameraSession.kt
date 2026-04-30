@@ -78,7 +78,6 @@ class CameraXHeadlessCameraSession @Inject constructor(
             val cameraProvider = providerFactory.get(context)
             val analysis = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .setResolutionSelector(
                     ResolutionSelector.Builder()
                         .setResolutionStrategy(
@@ -95,9 +94,17 @@ class CameraXHeadlessCameraSession @Inject constructor(
                 .build().apply {
                     targetRotation = orientationTracker.rotation.value.toSurfaceRotation()
                 }
-            analysis.setAnalyzer(analyzerExecutor) { proxy ->
-                handleFrame(proxy)
-            }
+            val analyzer = com.sentinelvault.face.FrameAnalyzer(
+                sanitizer = sanitizer,
+                onFrame = { bitmap, _ ->
+                    val prev = frames.tryReceive().getOrNull()
+                    if (prev != null) sanitizer.recycle(prev)
+                    val sent = frames.trySend(bitmap).isSuccess
+                    if (!sent) sanitizer.recycle(bitmap)
+                },
+                analysisIntervalMs = 333L // ~3 FPS, plenty for vigilance
+            )
+            analysis.setAnalyzer(analyzerExecutor, analyzer)
             cameraProvider.unbindAll()
             cameraProvider.bindToLifecycle(
                 lifecycleOwner,
@@ -134,16 +141,5 @@ class CameraXHeadlessCameraSession @Inject constructor(
                 sanitizer.recycle(drained)
             }
         }
-    }
-
-    private fun handleFrame(proxy: ImageProxy) {
-        val bitmap: Bitmap? = try { proxy.toBitmap() } catch (_: Throwable) { null }
-        sanitizer.close(proxy)
-        if (bitmap == null) return
-        // CONFLATED channel: trySend either accepts and replaces the previous slot, or fails
-        // when the consumer was cancelled. In the failure case we recycle to keep the
-        // memory-hygiene contract intact.
-        val sent = frames.trySend(bitmap).isSuccess
-        if (!sent) sanitizer.recycle(bitmap)
     }
 }
